@@ -98,3 +98,21 @@ To empower Ethiopian farmers with AI-driven tools that improve crop health, redu
 Developed by AgriMind Ethiopia Team
 
 GitHub: https://github.com/FETHUMOHAMMED/AgriMind-Ethiopia
+
+
+## Screenshots
+
+### API Documentation
+![Swagger](screenshots/swagger-home.png)
+
+### User Registration
+![Register](screenshots/register-success.png)
+
+### User Login
+![Login](screenshots/login-success.png)
+
+### Disease Prediction
+![Prediction](screenshots/prediction-success.png)
+
+### Prediction History
+![History](screenshots/prediction-history.png)
