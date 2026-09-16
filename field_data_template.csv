@@ -1,0 +1,4 @@
+image_id,crop,condition,location,date,growth_stage,symptoms,expert_label,treatment,outcome
+IMG001,teff,rust,Debre Zeit,2026-10-01,flowering,orange_pustules,teff___rust,sulfur_dusting,recovered
+IMG002,coffee,leaf_rust,Jimma,2026-10-05,fruiting,yellow_spots,coffee___leaf_rust,copper_fungicide,pending
+IMG003,maize,northern_leaf_blight,Bako,2026-10-08,vegetative,gray_lesions,maize___northern_leaf_blight,azoxystrobin,improved

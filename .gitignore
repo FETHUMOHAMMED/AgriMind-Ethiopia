@@ -216,3 +216,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# === AgriMind-specific ===
+backend/agrimind.db
+*.db
+*.sqlite
+*.sqlite3
+backend/uploads/
+backend/app/__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo

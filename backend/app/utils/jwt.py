@@ -2,9 +2,9 @@ from datetime import datetime, timedelta
 from jose import jwt
 import os
 
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-in-production")
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
 
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()

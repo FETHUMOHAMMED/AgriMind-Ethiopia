@@ -1,118 +1,92 @@
-# AgriMind-Ethiopia
-AI-powered crop disease detection and farmer assistance platform for Ethiopia.
-# 🌱 AgriMind Ethiopia
+# AgriMind Ethiopia
 
-**AI-powered agriculture assistant for Ethiopian farmers**
+**AI-powered crop disease detection and farmer assistance platform for Ethiopia.**
 
-AgriMind Ethiopia is a smart agricultural platform that helps farmers detect crop diseases, receive AI-based recommendations, and improve productivity using machine learning and computer vision.
+AgriMind Ethiopia lets farmers photograph a diseased crop leaf and receive an instant AI diagnosis with treatment recommendations in Amharic, Afaan Oromo, or English.
 
 ---
 
-## 🚀 Features
+## What This Is
 
-- 🔐 User Authentication (JWT-based)
-- 👨‍🌾 Farmer & Admin roles
-- 🌿 AI Crop Disease Detection (Image-based prediction)
-- 📊 Prediction history tracking
-- 📁 Image upload & storage system
-- 🤖 AI recommendation system
-- ⚡ FastAPI backend architecture
+A working end-to-end product — not a mockup. Farmers can register, log in, upload a crop photo, get an AI diagnosis, view prediction history, and switch languages. The system runs as both an Android app and a Flutter web app.
 
----
+## Features
 
-## 🧠 AI System
+- User authentication (JWT-based)
+- Farmer and Admin roles
+- AI crop disease detection (image-based prediction)
+- Prediction history tracking
+- Image upload and storage
+- AI recommendation system
+- Multilingual: Amharic, Afaan Oromo, English
 
-The system analyzes crop images and predicts diseases such as:
+## AI System
+
+The model analyzes crop images and predicts diseases including:
 
 - Tomato Early Blight
 - Tomato Late Blight
 - Maize Northern Leaf Blight
-- Other plant diseases (expandable model)
+- Potato and Coffee diseases
+- Wheat diseases
 
----
+Trained on real Ethiopian crop images with 9 disease classes. Accuracy will improve as the field dataset grows.
 
-## 🏗️ Tech Stack
+## Stack
 
-**Backend**
-- FastAPI
-- SQLAlchemy
-- SQLite (development stage)
-- JWT Authentication
-- Passlib (password hashing)
+| Layer | Technology |
+|-------|-----------|
+| Backend | Python, FastAPI |
+| Database | SQLite (PostgreSQL-ready) |
+| Authentication | JWT |
+| AI Model | scikit-learn Random Forest + ViT |
+| Frontend | Flutter (Android + Web) |
+| File handling | Local storage (Cloudinary-ready) |
 
-**AI**
-- PyTorch / CNN / Vision Transformer (planned upgrade)
+## Project Structure
 
-**Future Frontend**
-- Flutter (Mobile App)
+```
+backend/
+  app/
+    ai/            AI models, inference, training
+    database/      SQLite + SQLAlchemy setup
+    models/        User, Prediction, Feedback
+    routes/        Auth, predict, users, feedback, language
+    schemas/       Pydantic request/response schemas
+    utils/         JWT, security, dependencies
+    main.py        FastAPI entry point
 
----
+agrimind_mobile/
+  lib/             Flutter app (Android + Web)
 
-## 📡 API Endpoints
+screenshots/       UI screenshots
+field_data_template.csv   Data collection template
+```
 
-### Authentication
-- `POST /auth/register` → Register new user
-- `POST /auth/login` → Login user
+## Current Status
 
-### Users
-- `GET /users/me` → Get current user info
+**~70% — Working MVP, entering field validation.**
 
-### Prediction
-- `POST /predict/` → Upload crop image and get disease prediction
-- `GET /predict/history` → Get prediction history
+| Component | Progress |
+|-----------|----------|
+| Backend | 95% |
+| Authentication | 95% |
+| AI pipeline | 70% |
+| Mobile app | 90% |
+| Multilingual | 95% |
+| Field dataset | 10% |
+| Expert validation | 0% |
+| Cloud deployment | 0% |
 
----
+## Roadmap
 
-## 🧪 MVP Status
+1. Expand Ethiopian field dataset with agricultural experts
+2. Pilot with farmer cooperatives
+3. Validate model accuracy against expert diagnoses
+4. Deploy to cloud (backend + web)
+5. Production hardening
 
-- Backend API: ✅ Completed
-- Authentication: ✅ Completed
-- AI Prediction: ✅ Working (demo model)
-- Frontend: 🚧 In progress (Flutter planned)
+## Contact
 
----
-
-## 📦 Installation
-
-```bash
-git clone https://github.com/FETHUMOHAMMED/AgriMind-Ethiopia.git
-cd AgriMind-Ethiopia
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload
-
-
-🌍 Vision
-To empower Ethiopian farmers with AI-driven tools that improve crop health, reduce losses, and increase productivity.
-
-📌 Future Improvements
-🌦️ Weather prediction integration
-📱 Flutter mobile app
-🌐 Multi-language support (Amharic, Afaan Oromo)
-☁️ Cloud deployment (AWS / Railway / Render)
-🧠 Better AI model (custom-trained dataset)
-
-👨‍💻 Author
-
-Developed by AgriMind Ethiopia Team
-
-GitHub: https://github.com/FETHUMOHAMMED/AgriMind-Ethiopia
-
-
-## Screenshots
-
-### API Documentation
-![Swagger](screenshots/swagger-home.png)
-
-### User Registration
-![Register](screenshots/register-success.png)
-
-### User Login
-![Login](screenshots/login-success.png)
-
-### Disease Prediction
-![Prediction](screenshots/prediction-success.png)
-
-### Prediction History
-![History](screenshots/prediction-history.png)
+**Fethu Mohammed** — Python / FastAPI / React / Flutter Developer
+GitHub: [@FETHUMOHAMMED](https://github.com/FETHUMOHAMMED)
