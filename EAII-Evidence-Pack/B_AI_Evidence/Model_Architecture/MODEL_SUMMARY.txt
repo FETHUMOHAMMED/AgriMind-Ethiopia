@@ -1,0 +1,52 @@
+AGRIMIND AI MODEL — TECHNICAL SUMMARY
+======================================
+
+Architecture: MobileNetV2
+Framework: PyTorch
+Method: Transfer Learning (ImageNet pretrained weights)
+Input Size: 128 × 128 × 3 (RGB)
+
+Training Data:
+- Total images: 20,669
+- Source: PlantVillage dataset + 31 Ethiopian reference images
+- Classes: 19
+
+Training Configuration:
+- Batch size: 32
+- Epochs: 2 (CPU training, time-limited)
+- Learning rate: 0.001
+- Optimizer: Adam (classifier only, base layers frozen)
+- Loss: CrossEntropyLoss
+
+Performance:
+- Training accuracy: 81.8%
+- Validation accuracy: 85.4%
+- Test/Val split: 80/20
+
+Class List (19):
+1. coffee___leaf_rust
+2. maize___common_rust
+3. maize___northern_leaf_blight
+4. pepper___bacterial_spot
+5. pepper___healthy
+6. potato___early_blight
+7. potato___healthy
+8. potato___late_blight
+9. tomato___bacterial_spot
+10. tomato___early_blight
+11. tomato___healthy
+12. tomato___late_blight
+13. tomato___leaf_mold
+14. tomato___mosaic_virus
+15. tomato___septoria_leaf_spot
+16. tomato___spider_mites
+17. tomato___target_spot
+18. tomato___yellow_leaf_curl
+19. wheat___brown_rust
+
+Known Limitations:
+- Trained primarily on global data (PlantVillage)
+- Only 31 Ethiopian reference images in training set
+- No Ethiopian field data yet
+- Not validated on real Ethiopian farm conditions
+- CPU-only training limited to 2 epochs

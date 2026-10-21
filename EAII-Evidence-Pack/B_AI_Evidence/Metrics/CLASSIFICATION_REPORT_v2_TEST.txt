@@ -1,0 +1,118 @@
+AgriMind Model Evaluation - TEST SET (v2)
+==========================================
+
+Model:            MobileNetV2 (transfer learning, last2 unfrozen)
+Checkpoint:       agrimind_mobilenetv2_v2.pth
+Checkpoint SHA256: 5d17fede1070877f04bd3d94ed36e8c48d6d903d30f37e015af38de8132d598a
+Saved at epoch:   10 (best val_acc during training)
+Training val_acc: 95.28%
+Training val_macroF1: 0.9476
+Split seed:       42
+Image size:       128x128
+
+TEST SET (preserved, never seen during training):
+  Split:        splits.json (seed 42)
+  Test size:    3114 images
+  Classes:      15
+  Augmentation: NONE (resize + normalize only)
+  Split overlap: verified 0 shared paths between train/val/test
+  Class mapping: verified consistent (class_names order == class_to_idx)
+
+RESULTS:
+  Top-1 accuracy:  95.28%
+  Top-3 accuracy:  99.49%
+  Macro F1:        0.9509
+  Weighted F1:     0.9530
+
+Per-class report:
+                             precision    recall  f1-score   support
+
+    pepper___bacterial_spot     0.9868    0.9868    0.9868       151
+           pepper___healthy     0.9955    0.9865    0.9910       223
+      potato___early_blight     0.9801    0.9801    0.9801       151
+           potato___healthy     0.9583    0.9583    0.9583        24
+       potato___late_blight     0.9595    0.9404    0.9498       151
+    tomato___bacterial_spot     0.9776    0.9531    0.9652       320
+      tomato___early_blight     0.8598    0.9276    0.8924       152
+           tomato___healthy     0.9834    0.9875    0.9854       240
+       tomato___late_blight     0.9568    0.9236    0.9399       288
+         tomato___leaf_mold     0.9638    0.9236    0.9433       144
+      tomato___mosaic_virus     0.9322    0.9649    0.9483        57
+tomato___septoria_leaf_spot     0.9412    0.8989    0.9195       267
+      tomato___spider_mites     0.8906    0.9365    0.9130       252
+       tomato___target_spot     0.8767    0.9387    0.9066       212
+  tomato___yellow_leaf_curl     0.9854    0.9813    0.9834       482
+
+                   accuracy                         0.9528      3114
+                  macro avg     0.9498    0.9525    0.9509      3114
+               weighted avg     0.9539    0.9528    0.9530      3114
+
+
+Confusion matrix (rows=true, cols=predicted):
+Class order: pepper___bacterial_spot, pepper___healthy, potato___early_blight, potato___healthy, potato___late_blight, tomato___bacterial_spot, tomato___early_blight, tomato___healthy, tomato___late_blight, tomato___leaf_mold, tomato___mosaic_virus, tomato___septoria_leaf_spot, tomato___spider_mites, tomato___target_spot, tomato___yellow_leaf_curl
+[[149   0   1   0   0   0   0   0   0   0   0   0   1   0   0]
+ [  1 220   0   0   0   0   0   1   0   0   0   0   1   0   0]
+ [  0   0 148   0   1   0   0   0   0   0   0   2   0   0   0]
+ [  0   0   0  23   0   0   0   0   0   0   0   0   1   0   0]
+ [  0   0   1   1 142   0   4   0   2   0   0   1   0   0   0]
+ [  0   0   0   0   0 305   3   0   1   0   0   3   0   4   4]
+ [  0   0   0   0   0   1 141   0   3   0   0   1   3   3   0]
+ [  0   0   0   0   0   0   0 237   2   0   0   0   0   1   0]
+ [  1   0   0   0   5   0  12   0 266   1   0   1   0   1   1]
+ [  0   1   0   0   0   1   0   0   1 133   1   3   3   0   1]
+ [  0   0   0   0   0   0   0   0   0   0  55   1   1   0   0]
+ [  0   0   1   0   0   2   4   1   3   3   2 240   4   7   0]
+ [  0   0   0   0   0   0   0   1   0   0   1   1 236  12   1]
+ [  0   0   0   0   0   1   0   1   0   0   0   1  10 199   0]
+ [  0   0   0   0   0   2   0   0   0   1   0   1   5   0 473]]
+
+Excluded classes (insufficient training data, not in this model):
+  - coffee___leaf_rust: 4 images (insufficient_samples (need >= 100))
+  - maize___common_rust: 3 images (insufficient_samples (need >= 100))
+  - maize___northern_leaf_blight: 4 images (insufficient_samples (need >= 100))
+  - wheat___brown_rust: 3 images (insufficient_samples (need >= 100))
+
+LIMITATIONS:
+  - Training images are PlantVillage-derived public dataset images.
+  - DATASET_REGISTER_MASTER.csv is a Phase 2 planning template with
+    future-dated entries, not a record of collected field data.
+  - Real Ethiopian field data collection is planned with 5 partner
+    ARCs (Jimma, Melkassa, Kulumsa, Debre Zeit, Areka) under Tier 2/3
+    verification protocol (PCR/culture lab confirmation).
+  - This evaluation covers the 15-class scope only.
+  - Path-level split separation was verified; image-level duplicate
+    detection (perceptual hashing) was not performed.
+
+================================================================================
+PERCEPTUAL-HASH + SHA-256 DUPLICATE AUDIT
+================================================================================
+Method: 8x8 pHash (Hamming <= 5/64) same-class, followed by SHA-256 byte-level
+verification for every candidate pair.
+
+Results:
+  - 15 train/test pHash candidate pairs identified
+  - 10 train/validation candidate pairs
+  - 0 validation/test candidate pairs
+
+SHA-256 verification (definitive):
+  - 3 pairs BYTE-IDENTICAL (same file, guaranteed leakage):
+      tomato___late_blight / GHLB2 Leaf 9011.JPG       (SHA256 7ff8410d...)
+      tomato___late_blight / GHLB_PS Leaf 23.7 Day 13  (SHA256 375eee7b...)
+      tomato___late_blight / GHLB_PS Leaf 24 Day 16    (SHA256 4913a383...)
+  - 12 pairs DIFFERENT FILES (SHA-256 mismatch): perceptual similarity only,
+    not byte-level duplication
+
+Impact on reported accuracy:
+  3 byte-identical test images = 0.10% of the 3,114-image test set.
+  Worst-case honest floor: 95.28% -> 95.18%.
+  All remaining 12 candidate pairs are distinct files, so they do not
+  constitute leakage under strict byte-level criteria.
+
+Disclosure:
+  The reported Top-1 accuracy of 95.28% on the held-out split includes 0.10
+  percentage points of confirmed byte-identical train/test contamination.
+  A deduplicated split would yield approximately 95.18% (not remeasured).
+  The model's performance on independently collected Ethiopian field images
+  remains a separate validation requirement, not addressed by this audit.
+
+================================================================================

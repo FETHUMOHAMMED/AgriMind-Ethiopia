@@ -1,0 +1,64 @@
+==============================================================================
+ETHIOPIAN CROPS PROVENANCE AUDIT (honest version)
+==============================================================================
+Audit date: 2026-10-19 13:30
+Dataset folder: C:\projects\AgriMind-Ethiopia\backend\app\ai\datasets\ethiopian_crops
+Total images found: 20669
+Total crop/disease subdirectories: 24
+  Populated: 19
+  Empty:     5
+
+CRITICAL CONTEXT:
+------------------------------------------------------------------------------
+This folder contains 20669 images, the SAME count as flat_crops
+(C:\projects\AgriMind-Ethiopia\backend\app\ai\datasets\flat_crops). It is a reorganized copy, not independently
+collected Ethiopian field data. All 20,669 images are the SAME files
+as flat_crops, restructured into crop/disease/ subdirectories.
+
+Every structured field in this audit (Source, Region, GPS, Collector,
+Collection_Date, Expert_Label, Lab_Test, Verification_Level) is
+marked UNKNOWN or UNVERIFIED because no such metadata exists.
+The 'Field_Verified' column is FALSE for every image.
+
+Real Ethiopian field data collection is a PHASE 2 deliverable under
+DATASET_REGISTER_MASTER.csv (5 partner ARCs, Tier 2/3 protocol).
+As of the audit date, that collection has not begun — the register
+contains future-dated planning entries.
+
+POPULATED CLASSES (crop/disease: image count):
+------------------------------------------------------------------------------
+  maize/common_rust                             3
+  wheat/brown_rust                              3
+  coffee/leaf_rust                              4
+  maize/northern_leaf_blight                    4
+  potato/healthy                              152
+  tomato/mosaic_virus                         373
+  tomato/leaf_mold                            952
+  pepper/bacterial_spot                       997
+  potato/early_blight                        1003
+  potato/late_blight                         1003
+  tomato/early_blight                        1004
+  tomato/target_spot                         1404
+  pepper/healthy                             1478
+  tomato/healthy                             1594
+  tomato/spider_mites                        1676
+  tomato/septoria_leaf_spot                  1771
+  tomato/late_blight                         1913
+  tomato/bacterial_spot                      2127
+  tomato/yellow_leaf_curl                    3208
+
+EMPTY CLASSES (declared in folder structure but no images):
+------------------------------------------------------------------------------
+  coffee/healthy
+  maize/healthy
+  teff/healthy
+  teff/rust
+  wheat/healthy
+
+==============================================================================
+CONCLUSION
+==============================================================================
+This audit does not establish provenance. It documents ABSENCE of
+provenance. Do not cite as evidence of Ethiopian field collection.
+Cite as: 'Datasets folder contains 20669 images, structurally identical
+to PlantVillage-derived flat_crops. Field collection is Phase 2.'

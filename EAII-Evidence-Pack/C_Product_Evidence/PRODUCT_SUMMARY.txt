@@ -1,0 +1,37 @@
+AGRIMIND PRODUCT SUMMARY
+========================
+
+Product Type: Mobile + Web Application
+Platform: Flutter (Android) + Flutter Web (Chrome)
+Backend: FastAPI (Python)
+Database: SQLite
+Authentication: JWT
+
+Working Features:
+1. User Registration (email + password)
+2. Login / Logout
+3. Crop Image Upload (camera or gallery)
+4. AI Disease Prediction
+5. Confidence Score Display
+6. Treatment Recommendations
+7. Symptoms Description
+8. Prevention Advice
+9. Expert Escalation Advice
+10. Prediction History
+11. Multi-language Support (English, Amharic, Afaan Oromo)
+12. Feedback System (thumbs up/down)
+
+API Endpoints:
+- POST /auth/register
+- POST /auth/login
+- POST /predict/
+- GET /predict/history
+- GET /predict/stats
+- GET /users/me
+- POST /feedback/
+
+Access:
+- Chrome: http://localhost:8000 (same PC)
+- Phone: http://192.168.8.4:8000 (same WiFi)
+
+Status: Working MVP — ready for field validation

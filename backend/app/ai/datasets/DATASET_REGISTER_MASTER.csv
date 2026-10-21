@@ -1,0 +1,6 @@
+Case_ID,Crop,Disease,AEZ,Region,Woreda,GPS_Lat,GPS_Lon,Altitude_m,Temp_C,Humidity_Pct,Rainfall_7d_mm,Soil_Moisture,Growth_Stage,Date,Collector,Partner_Institution,Expert_ID,Lab_Test,Verification_Level,Image_Count
+ETH-0001,Coffee,Leaf Rust,Woina Dega,Oromia,Jimma,7.6733,36.8344,1750,22.5,78,45,Medium,Fruiting,2026-11-15,Fethu,Jimma ARC,E-001,Pending,Tier 2,3
+ETH-0002,Maize,Northern Leaf Blight,Woina Dega,Oromia,Adama,8.5400,39.2694,1650,26.8,65,20,Low,Vegetative,2026-11-20,Agri Expert,Melkassa ARC,E-002,Completed (PCR),Tier 3,4
+ETH-0003,Wheat,Stem Rust,Dega,Oromia,Asella,7.9500,39.1167,2200,18.2,82,60,High,Heading,2026-11-25,Agri Expert,Kulumsa ARC,E-003,Pending,Tier 2,5
+ETH-0004,Teff,Head Smudge,Woina Dega,Oromia,Bishoftu,8.7500,38.9833,1900,24.1,70,35,Medium,Flowering,2026-12-01,Agri Expert,Debre Zeit ARC,E-004,Not required,Tier 2,3
+ETH-0005,Enset,Bacterial Wilt,Moisture Sufficient,SNNP,Areka,7.0667,37.7167,1800,20.5,85,80,High,Vegetative,2026-12-05,Agri Expert,Areka ARC,E-005,Completed (Culture),Tier 3,4

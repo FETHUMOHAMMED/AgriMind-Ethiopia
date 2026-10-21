@@ -1,0 +1,67 @@
+================================================================================
+TRAIN/VALIDATION PHASH AUDIT — INTERPRETATION
+================================================================================
+Audit date: 2026-10-19
+Method: 8x8 pHash (Hamming <= 5/64), same-class, SHA-256 byte verification
+Split audited: splits.json (original, unchanged)
+Sources: TRAIN_VAL_PHASH_AUDIT.csv, TRAIN_VAL_PHASH_AUDIT_SUMMARY.txt
+
+RESULTS
+--------------------------------------------------------------------------------
+Candidate pairs (Hamming <= 5):   10
+  BYTE_IDENTICAL:                  1
+  VISUALLY_SIMILAR_DISTINCT:       9
+
+The byte-identical pair:
+  Class:      tomato___late_blight
+  File:       GHLB_PS Leaf 23.5 Day 13.jpg
+  Train SHA:  90220c67ab2c3ed150e93f0c26691d463200e784c74152e62acedac8a4d2d525
+  Val SHA:    90220c67ab2c3ed150e93f0c26691d463200e784c74152e62acedac8a4d2d525
+
+IMPACT ON VALIDATION METRICS AND CHECKPOINT SELECTION
+--------------------------------------------------------------------------------
+One byte-identical image was identified across the training and validation
+partitions. Its effect on validation metrics and checkpoint selection has not
+been independently quantified. A single changed validation prediction could
+in principle change an epoch-to-epoch comparison; the 1/3,090 = 0.03pp
+proportion of the validation set is a direct-count bound on the fraction of
+affected examples, not a proof that epoch selection was unaffected.
+
+A grouped, duplicate-controlled split is recommended for future model
+selection to eliminate this class of ambiguity entirely.
+
+IMPACT ON THE REPORTED TEST METRIC
+--------------------------------------------------------------------------------
+The reported test metric (95.27% top-1 on 3,106 leakage-controlled images)
+is unaffected by train/validation leakage. Test-set integrity was
+independently verified via the test-side pHash + SHA-256 audit, which
+identified 3 byte-identical duplicates; those are documented in the
+Scenario A and Scenario B split variants and in CLASSIFICATION_REPORT_v2_TEST_*.txt.
+
+RELATIONSHIP TO SCENARIO A/B
+--------------------------------------------------------------------------------
+Scenarios A and B are test-set variants. The train/validation boundary is
+identical in splits.json, splits_scenarioA.json, and splits_scenarioB.json;
+the finding in this audit therefore applies equally to all three.
+
+PHASE 2 RECOMMENDATION
+--------------------------------------------------------------------------------
+All 4 confirmed byte-identical duplicates identified across the entire
+audit (3 test-side + 1 val-side) belong to the same PlantVillage
+"GHLB_PS ... Day 13" photography session. This is a structural artifact
+of filename-based random splitting: images from a single photography
+session scatter across partitions.
+
+Fix for Phase 2: group images by photography session BEFORE random
+partitioning, not by individual filename.
+
+SAFER EAII STATEMENT
+--------------------------------------------------------------------------------
+"One byte-identical duplicate was identified across the training and
+validation partitions of the original split. Its effect on validation
+accuracy and on epoch selection has not been independently quantified.
+A grouped, duplicate-controlled split is recommended for future model
+selection. The reported test metric is independent of this finding and
+was separately audited against byte-level leakage."
+
+================================================================================

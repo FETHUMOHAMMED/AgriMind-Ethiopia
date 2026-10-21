@@ -1,0 +1,32 @@
+Image_ID,Crop,Condition,Source,Region,Collector,Date,Label_Verified,Notes
+ETH-001,Coffee,Leaf Rust,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-002,Coffee,Leaf Rust,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-003,Coffee,Leaf Rust,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-004,Coffee,Leaf Rust,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-005,Maize,Common Rust,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-006,Maize,Common Rust,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-007,Maize,Common Rust,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-008,Maize,Northern Leaf Blight,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-009,Maize,Northern Leaf Blight,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-010,Maize,Northern Leaf Blight,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-011,Maize,Northern Leaf Blight,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-012,Potato,Early Blight,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-013,Potato,Early Blight,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-014,Potato,Early Blight,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-015,Potato,Late Blight,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-016,Potato,Late Blight,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-017,Potato,Late Blight,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-018,Tomato,Early Blight,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-019,Tomato,Early Blight,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-020,Tomato,Early Blight,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-021,Tomato,Early Blight,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-022,Tomato,Healthy,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-023,Tomato,Healthy,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-024,Tomato,Healthy,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-025,Tomato,Late Blight,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-026,Tomato,Late Blight,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-027,Tomato,Late Blight,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-028,Tomato,Late Blight,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-029,Wheat,Brown Rust,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-030,Wheat,Brown Rust,Internet,Unknown,None,2026-09,No,Reference image from public source
+ETH-031,Wheat,Brown Rust,Internet,Unknown,None,2026-09,No,Reference image from public source

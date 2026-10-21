@@ -1,0 +1,35 @@
+AgriMind Model Evaluation Report
+==============================
+Model: MobileNetV2
+Total model classes: 19
+Classes in validation set: 17
+Validation images: 4134
+
+                             precision    recall  f1-score   support
+
+         coffee___leaf_rust       0.00      0.00      0.00         1
+        maize___common_rust       0.00      0.00      0.00         1
+    pepper___bacterial_spot       0.99      0.82      0.90       185
+           pepper___healthy       0.91      1.00      0.95       293
+      potato___early_blight       0.93      0.96      0.94       192
+           potato___healthy       0.95      0.91      0.93        22
+       potato___late_blight       0.90      0.93      0.92       211
+    tomato___bacterial_spot       0.91      0.86      0.89       434
+      tomato___early_blight       0.69      0.66      0.68       213
+           tomato___healthy       0.87      0.98      0.92       331
+       tomato___late_blight       0.89      0.80      0.84       401
+         tomato___leaf_mold       0.80      0.75      0.78       176
+      tomato___mosaic_virus       0.83      0.68      0.74        77
+tomato___septoria_leaf_spot       0.75      0.82      0.78       353
+      tomato___spider_mites       0.95      0.64      0.77       326
+       tomato___target_spot       0.68      0.84      0.75       294
+  tomato___yellow_leaf_curl       0.89      0.98      0.93       624
+
+                   accuracy                           0.86      4134
+                  macro avg       0.76      0.74      0.75      4134
+               weighted avg       0.86      0.86      0.86      4134
+
+
+Missing classes (no validation images):
+  - maize___northern_leaf_blight
+  - wheat___brown_rust

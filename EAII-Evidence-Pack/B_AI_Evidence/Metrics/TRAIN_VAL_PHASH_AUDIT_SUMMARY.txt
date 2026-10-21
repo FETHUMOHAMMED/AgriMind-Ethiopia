@@ -1,0 +1,28 @@
+==============================================================================
+TRAIN/VALIDATION BOUNDARY pHASH AUDIT
+==============================================================================
+Audit date: 2026-10-19 13:36
+Split file: splits.json
+Train: 14451 images   Val: 3090 images
+pHash size: 8x8  Threshold: Hamming <= 5/64
+
+RESULTS:
+------------------------------------------------------------------------------
+  BYTE_IDENTICAL                           1
+  VISUALLY_SIMILAR_DISTINCT_FILES          9
+
+  TOTAL candidate pairs: 10
+
+⚠️  BYTE-IDENTICAL PAIRS FOUND — val leakage confirmed
+------------------------------------------------------------------------------
+  tomato___late_blight: GHLB_PS Leaf 23.5 Day 13.jpg
+
+INTERPRETATION:
+------------------------------------------------------------------------------
+Val leakage affects model-selection evidence (best-epoch choice),
+not the reported test metric. Even if some candidates were confirmed
+duplicates, they would only inflate val_acc by at most
+10/3090 = 0.32pp, affecting
+which epoch is saved — not the 95.27% test result.
+
+Splits are NOT modified by this audit. This is documentation only.

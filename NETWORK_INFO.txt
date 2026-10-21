@@ -1,0 +1,17 @@
+AGRIMIND NETWORK INFO
+
+PC IP (fixed):       192.168.8.4
+Backend port:        8000
+Backend URL:         http://192.168.8.4:8000
+
+Chrome baseUrl:      http://localhost:8000
+Phone baseUrl:       http://192.168.8.4:8000
+
+Router admin:        http://192.168.8.1
+DHCP range:          192.168.8.2 - 254
+Binding:             fitih-111 → 192.168.8.4
+
+If IP ever changes:
+1. Open router admin (192.168.8.1)
+2. DHCP → IP and MAC Binding
+3. Verify binding is still active

@@ -1,0 +1,54 @@
+============================================================
+AGRIMIND 31-IMAGE AUDIT SUMMARY
+============================================================
+Audit Date: 2026-10-16 11:07
+Total Images Found: 20669
+
+BY CROP:
+  coffee: 4
+  maize: 7
+  pepper: 2475
+  potato: 2158
+  tomato: 16022
+  wheat: 3
+
+BY CROP/DISEASE:
+  coffee/leaf_rust: 4
+  maize/common_rust: 3
+  maize/northern_leaf_blight: 4
+  pepper/bacterial_spot: 997
+  pepper/healthy: 1478
+  potato/early_blight: 1003
+  potato/healthy: 152
+  potato/late_blight: 1003
+  tomato/bacterial_spot: 2127
+  tomato/early_blight: 1004
+  tomato/healthy: 1594
+  tomato/late_blight: 1913
+  tomato/leaf_mold: 952
+  tomato/mosaic_virus: 373
+  tomato/septoria_leaf_spot: 1771
+  tomato/spider_mites: 1676
+  tomato/target_spot: 1404
+  tomato/yellow_leaf_curl: 3208
+  wheat/brown_rust: 3
+
+BY VERIFICATION LEVEL:
+  Tier 1: 20669
+
+BY SOURCE:
+  Internet: 20669
+
+============================================================
+HONEST ASSESSMENT
+============================================================
+All images are currently classified as Tier 1 (unverified).
+Source is recorded as 'Internet' — NOT Ethiopian field data.
+No expert verification has been performed yet.
+No laboratory confirmation exists for any image.
+
+ACTION REQUIRED:
+1. Agri Expert must review each image and update Expert_Label
+2. Source must be verified and corrected if possible
+3. Select 5-10 ambiguous cases for laboratory testing
+4. Add these images to the master register with full metadata

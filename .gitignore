@@ -227,3 +227,9 @@ backend/app/__pycache__/
 **/__pycache__/
 *.pyc
 *.pyo
+
+# Large video files (share via external link)
+EAII-Evidence-Pack/C_Product_Evidence/Demo_Video/*.mp4
+
+# Large video files (share via external link)
+EAII-Evidence-Pack/C_Product_Evidence/Demo_Video/*.mp4

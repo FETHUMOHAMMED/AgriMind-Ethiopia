@@ -1,0 +1,14 @@
+AGRIMIND NETWORK SETUP
+
+Backend runs on: http://192.168.8.4:8000
+(Check with: ipconfig → Wi-Fi IPv4)
+
+For Chrome: http://localhost:8000
+For Phone:  http://192.168.8.4:8000
+For Emulator: http://10.0.2.2:8000
+
+How to update:
+1. Run ipconfig
+2. Copy IPv4 address
+3. Update lib/services/api_service.dart
+4. Hot restart (R)

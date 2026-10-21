@@ -1,0 +1,28 @@
+﻿# Python
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.pytest_tmp/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads (runtime artifacts)
+uploads/
+
+# Large datasets — tracked separately, not in git
+app/ai/datasets/flat_crops/
+app/ai/datasets/ethiopian_crops/
+app/ai/datasets/field_images/
+
+# Model checkpoints — tracked separately via evidence pack
+app/ai/model/*.pth
+app/ai/model/*.pkl
+
+# OS
+.DS_Store
+Thumbs.db

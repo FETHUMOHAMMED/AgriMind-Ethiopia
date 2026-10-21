@@ -1,0 +1,55 @@
+================================================================================
+LEAKAGE-CONTROLLED EVALUATION SUMMARY
+================================================================================
+Model:                MobileNetV2 (agrimind_mobilenetv2_v2.pth)
+Checkpoint SHA256:    5d17fede1070877f04bd3d94ed36e8c48d6d903d30f37e015af38de8132d598a
+Training epoch:       10 (best val_acc during training)
+Training val_acc:     95.28% | val_macroF1: 0.9476
+
+THREE-WAY EVALUATION COMPARISON
+--------------------------------------------------------------------------------
+                                          Top-1   Top-3   Macro   Weighted  Test
+Split                          Excluded    acc     acc     F1       F1       N
+--------------------------------------------------------------------------------
+Original (splits.json)            0      95.28%  99.49%  0.9509   0.9530   3114
+Scenario A (confirmed only)       3      95.27%  99.49%  0.9508   0.9530   3111
+Scenario B (confirmed+suspected)  8      95.27%  99.48%  0.9508   0.9529   3106
+--------------------------------------------------------------------------------
+Delta (B vs Original):           -0.01pp  -0.01pp  -0.0001  -0.0001   -8
+================================================================================
+
+INTERPRETATION
+--------------------------------------------------------------------------------
+Confirmed byte-identical duplicates:  3 (SHA-256 match, pairs 9-11).
+Suspected same-leaf candidates:       5 (SHA-256 differ, pixel MAE 9.97-23.05).
+Total test images removed:            8 (0.26% of test set).
+Impact on Top-1 accuracy:             0.01 percentage points (95.28% -> 95.27%).
+All removed images were correctly classified in the original run.
+
+CONCLUSION
+--------------------------------------------------------------------------------
+The leakage was real (3 byte-identical training/test duplicates confirmed by
+SHA-256 cryptography) but immaterial to the reported metric (0.01pp effect).
+Both numbers are defensible. The Scenario B result (95.27% on 3,106 fully
+leakage-controlled images) is recommended as the authoritative evaluation for
+EAII submission, with the Original (95.28% on 3,114) documented as the
+pre-audit baseline that contained 0.10% byte-identical contamination.
+
+NOT YET AUDITED (deferred)
+--------------------------------------------------------------------------------
+- train/validation boundary (10 pHash candidates found, not excluded)
+- any duplicate pairs beyond the 15 pHash candidates originally identified
+
+Preserved files (reproducibility):
+--------------------------------------------------------------------------------
+- splits.json (original 3114-image split)
+- splits_scenarioA.json (3,111 images, 3 confirmed duplicates excluded)
+- splits_scenarioB.json (3,106 images, 8 confirmed+suspected excluded)
+- splits_v2_PRIOR_8PAIR_ATTEMPT.json (earlier attempt, preserved for comparison)
+- CLASSIFICATION_REPORT_v2_TEST.txt (original report, unchanged)
+- CLASSIFICATION_REPORT_v2_TEST_SCENARIOA.txt (Scenario A result)
+- CLASSIFICATION_REPORT_v2_TEST_SCENARIOB.txt (Scenario B result)
+- CLASSIFICATION_REPORT_v2_TEST_SPLITS.txt (re-run of original split)
+- confusion_matrix_v2_test_*.csv (4 files, one per evaluation)
+- phash_train_test_contact_sheet.jpg (visual audit)
+================================================================================

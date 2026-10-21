@@ -35,48 +35,72 @@ async def predict(
 ):
     # Read file contents
     contents = await file.read()
-    
+
     # Validate file size
     if len(contents) > MAX_FILE_SIZE:
         raise HTTPException(status_code=400, detail="File too large")
-    
+
     # Validate file extension
     ext = os.path.splitext(file.filename or ".jpg")[1].lower().lstrip(".")
     if ext not in ALLOWED_EXTENSIONS:
         raise HTTPException(status_code=400, detail=f"File type .{ext} not allowed")
-    
-    # Save image
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    unique_name = f"{uuid.uuid4()}.{ext}"
-    file_path = os.path.join(UPLOAD_DIR, unique_name)
-    with open(file_path, "wb") as f:
-        f.write(contents)
-    
-    # Get prediction (with error handling)
+
+    # FIX 5: Run inference BEFORE saving anything
+    # FIX 6: Map errors to correct HTTP status codes
+    # FIX 7: Service Unavailable is now handled via RuntimeError in predictor
     try:
         result = predict_disease(contents)
         print(f"PREDICTION RESULT: {result}")
-    except Exception as e:
-        print(f"Prediction error: {e}")
-        raise HTTPException(status_code=500, detail="Prediction failed. Please try again.")
-    
-    # Save to DB
+    except ValueError:
+        # FIX 4: Invalid image bytes → 400
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid image data.",
+        )
+    except RuntimeError:
+        # FIX 7: Model unavailable or inference failed → 503
+        raise HTTPException(
+            status_code=503,
+            detail="The prediction service is unavailable. Please try again later.",
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=500,
+            detail="Prediction failed. Please try again.",
+        )
+
+    # FIX 5: Only NOW save the image and database record
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    unique_name = f"{uuid.uuid4()}.{ext}"
+    file_path = os.path.join(UPLOAD_DIR, unique_name)
+
     try:
+        with open(file_path, "wb") as f:
+            f.write(contents)
+
         prediction = Prediction(
             user_id=current_user["user_id"],
             image_url=file_path,
             disease=result["name"],
             confidence=result["confidence"],
-            recommendation=result["recommendation"]
+            recommendation=result["recommendation"],
         )
         db.add(prediction)
         db.commit()
         db.refresh(prediction)
-    except Exception as e:
+    except Exception:
         db.rollback()
-        print(f"Database error: {e}")
-        raise HTTPException(status_code=500, detail="Failed to save prediction")
-    
+        # FIX 8: Avoid leaving an orphaned upload if DB save fails
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except OSError:
+            pass
+        raise HTTPException(
+            status_code=500,
+            detail="Failed to save prediction.",
+        )
+
     return {
         "prediction_id": prediction.id,
         "disease": result["name"],
@@ -85,7 +109,7 @@ async def predict(
         "symptoms": result.get("symptoms", ""),
         "prevention": result.get("prevention", ""),
         "expert_help": result.get("expert_help", ""),
-        "diagnosed_by": current_user["email"]
+        "diagnosed_by": current_user["email"],
     }
 
 

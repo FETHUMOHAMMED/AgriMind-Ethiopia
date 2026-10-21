@@ -1,0 +1,70 @@
+================================================================================
+EAII CRITICAL DISCLOSURE - DATASET INVENTORY VS. FIELD-COLLECTED DATA
+================================================================================
+Date: 2026-10-19
+For: Ethiopian Artificial Intelligence Institute (EAII) submission
+
+PURPOSE OF THIS DOCUMENT
+--------------------------------------------------------------------------------
+To distinguish, unambiguously, between the size of the file inventory on disk
+and the amount of independently collected, expert-verified, lab-confirmed
+Ethiopian field data actually available for AgriMind.
+
+THE NUMBERS
+--------------------------------------------------------------------------------
+Folders containing 20,669 image files each (three copies, same data):
+  - flat_crops/                                        20,669 files
+  - ethiopian_crops/                                   20,669 files
+  - EAII-Evidence-Pack/A_Dataset_Evidence/Original_31_Images/  20,669 files
+  Total file instances across all three folders:       62,007 files
+  Unique images represented by all three folders:      20,669 unique images
+
+Note: The folder named "Original_31_Images" does NOT contain 31 images. Its
+contents are another reorganized copy of flat_crops (same 20,669 files, same
+per-class counts). Its name is inherited from an earlier project phase and
+is misleading; it is documented here for transparency.
+
+- Independently collected Ethiopian field photographs:    0
+- Expert-verified (Tier 2 or higher) Ethiopian images:    0
+- Lab-confirmed (Tier 3) Ethiopian images:                0
+- Field_Verified = TRUE in provenance audit:              0 of 20,669
+
+WHAT THIS MEANS
+--------------------------------------------------------------------------------
+The ethiopian_crops and Original_31_Images folder names are descriptive of
+intended Phase 2 content or earlier project phases, NOT of actual content.
+Both are reorganized copies of the public PlantVillage-derived flat_crops
+dataset. Every image's Field_Verified flag is FALSE in
+ETHIOPIAN_CROPS_PROVENANCE_AUDIT.csv.
+
+The 20,669-file inventory therefore does NOT represent 20,669 Ethiopian
+farm observations, and the 62,007 total file instances across the project
+represent the SAME 20,669 public images duplicated three times. It represents:
+  - PlantVillage / public reference imagery
+  - Reorganized into crop/disease folder structure in three locations
+  - With no verified Ethiopian geographic provenance, collector identity,
+    GPS coordinates, collection date, expert label, or lab confirmation
+
+WHAT IS SUPPORTED
+--------------------------------------------------------------------------------
+- Model evaluation on a held-out public-dataset split:   YES
+  (95.27% top-1 on 3,106 leakage-controlled images,
+   documented in CLASSIFICATION_REPORT_v2_TEST_SCENARIOB.txt)
+
+- Model evaluation on Ethiopian farm imagery:            NO
+- Field-validated disease diagnosis:                     NO
+- Lab-confirmed disease diagnosis:                       NO
+
+PHASE 2 ROADMAP (documented, not yet started)
+--------------------------------------------------------------------------------
+The following is planned but has NOT yet occurred:
+  - Field collection from 5 Ethiopian partner ARCs
+    (Jimma, Melkassa, Kulumsa, Debre Zeit, Areka)
+  - Tier 2 expert-assessment and Tier 3 lab-confirmation protocols
+  - Documented in DATASET_REGISTER_MASTER.csv as a planning template
+    with future-dated collection entries (Nov/Dec 2026)
+
+The DATASET_REGISTER_MASTER.csv file is a collection plan, not a record
+of completed collection. Its future-dated entries confirm this distinction.
+
+================================================================================

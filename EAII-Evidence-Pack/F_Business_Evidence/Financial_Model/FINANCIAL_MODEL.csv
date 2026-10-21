@@ -1,0 +1,13 @@
+Category,Item,Year_1,Year_2,Year_3,Notes
+REVENUE,Institutional Pilots,22500,75000,200000,3 pilots → 10 → 25
+REVENUE,Cooperative Subscriptions,2000,30000,120000,2 → 20 → 60 coops
+REVENUE,API Access,5000,25000,100000,1 → 5 → 15 partners
+REVENUE,Total Revenue,29500,130000,420000,
+COSTS,Personnel,8220,25000,60000,3-person team
+COSTS,Technology,1320,3000,6000,Cloud + AI compute
+COSTS,Field Data,2124,8000,15000,Collection + labeling
+COSTS,Office,600,1800,3600,Shared space
+COSTS,Launch,865,2000,5000,Marketing + events
+COSTS,Contingency,2100,6000,12000,15% buffer
+COSTS,Total Costs,15229,45800,101600,
+NET,Net Position,14271,84200,318400,
