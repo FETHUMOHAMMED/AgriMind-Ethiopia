@@ -5,7 +5,7 @@
 
 ## Access
 
-- **URL:** [PASTE GOOGLE DRIVE / ONEDRIVE LINK HERE]
+- **URL:** https://drive.google.com/file/d/https://drive.google.com/file/d/1yrdS5Z6VlZanh7Q0tbapuWhPXnCOua5i/view?usp=sharing/view
 - **Permission:** Anyone with the link can view
 
 ## Contents
