@@ -1,52 +1,64 @@
 AGRIMIND AI MODEL — TECHNICAL SUMMARY
 ======================================
 
-Architecture: MobileNetV2
-Framework: PyTorch
+Architecture: MobileNetV2 (PyTorch)
 Method: Transfer Learning (ImageNet pretrained weights)
 Input Size: 128 × 128 × 3 (RGB)
 
-Training Data:
-- Total images: 20,669
-- Source: PlantVillage dataset + 31 Ethiopian reference images
+TWO MODELS IN EVIDENCE PACK
+============================
+
+v1 — Deployed in production
+---------------------------
+- Checkpoint: agrimind_mobilenetv2.pth
+- SHA256: 9b2a3c0572cdba4ce216c3581de08793a401e1c4060b74913290a7a3636afa0a
 - Classes: 19
+- Status: Live in production, unchanged since 20-Sep-26
+- Training method: original script (2 epochs, base frozen, random 80/20 split)
+- Historical validation accuracy: 85.4% (on the original random split)
+- NOT evaluated under the current leakage-controlled protocol
+- Covers coffee, maize, wheat, pepper, potato, tomato (19 classes)
 
-Training Configuration:
-- Batch size: 32
-- Epochs: 2 (CPU training, time-limited)
-- Learning rate: 0.001
-- Optimizer: Adam (classifier only, base layers frozen)
-- Loss: CrossEntropyLoss
+v2 — Evaluated candidate (not deployed)
+---------------------------------------
+- Checkpoint: agrimind_mobilenetv2_v2.pth
+- SHA256: 5d17fede1070877f04bd3d94ed36e8c48d6d903d30f37e015af38de8132d598a
+- Classes: 15
+- Status: Evaluated candidate — deployment requires Phase 2 UI crop selection
+- Training method: pipeline-fixed script (10 epochs, last 2 MobileNet blocks
+  + classifier unfrozen, deterministic splits.json with seed 42, no 5,000-image cap)
+- Validation accuracy: 95.28% (best epoch during training)
+- TEST accuracy: 95.27% top-1 on 3,106 held-out leakage-controlled images
+  (byte-for-byte reproducible — SHA256 E45079C2D74A0DFFD95F87E025A9E8D9B84372796C5975CBD908904906A0D1CD)
+- Top-3: 99.48% | Macro F1: 0.9508 | Weighted F1: 0.9529
+- Excludes 4 rare diseases due to insufficient training data:
+  coffee___leaf_rust (4 images), maize___common_rust (3),
+  maize___northern_leaf_blight (4), wheat___brown_rust (3)
+- Supported scope: 15 crop-disease classes across tomato, pepper, potato
 
-Performance:
-- Training accuracy: 81.8%
-- Validation accuracy: 85.4%
-- Test/Val split: 80/20
+TRAINING DATA (BOTH MODELS)
+============================
+- Total images: 20,669
+- Source: PlantVillage-derived public imagery
+- Field-verified Ethiopian images: 0 of 20,669
+  (every image's Field_Verified flag is FALSE in provenance audit)
+- NOTE: The 'ethiopian_crops' and 'Original_31_Images' folders are
+  reorganized copies of flat_crops — same 20,669 images, not additional
+  data. The "31 images" naming predates the current dataset and is
+  not accurate.
 
-Class List (19):
-1. coffee___leaf_rust
-2. maize___common_rust
-3. maize___northern_leaf_blight
-4. pepper___bacterial_spot
-5. pepper___healthy
-6. potato___early_blight
-7. potato___healthy
-8. potato___late_blight
-9. tomato___bacterial_spot
-10. tomato___early_blight
-11. tomato___healthy
-12. tomato___late_blight
-13. tomato___leaf_mold
-14. tomato___mosaic_virus
-15. tomato___septoria_leaf_spot
-16. tomato___spider_mites
-17. tomato___target_spot
-18. tomato___yellow_leaf_curl
-19. wheat___brown_rust
-
-Known Limitations:
-- Trained primarily on global data (PlantVillage)
-- Only 31 Ethiopian reference images in training set
-- No Ethiopian field data yet
+KNOWN LIMITATIONS
+=================
+- Trained on PlantVillage-derived public imagery, not Ethiopian field photos
+- No expert-verified or lab-confirmed Ethiopian images
 - Not validated on real Ethiopian farm conditions
-- CPU-only training limited to 2 epochs
+- v2's 15-class scope excludes 4 rare diseases (coffee/maize/wheat)
+- v2 requires UI-level crop selection before safe deployment
+  (closed-set classifier limitation — coffee/maize/wheat inputs would be
+  misclassified as tomato/pepper/potato diseases)
+- Evaluation is a partial leakage-control sensitivity analysis,
+  not a full leakage-free audit (one train/val byte-identical duplicate
+  remains, effect not independently quantified)
+
+See EAII_SUBMISSION_SUMMARY.md and CRITICAL_DISCLOSURE_INVENTORY_VS_FIELD_DATA.txt
+for full context.
