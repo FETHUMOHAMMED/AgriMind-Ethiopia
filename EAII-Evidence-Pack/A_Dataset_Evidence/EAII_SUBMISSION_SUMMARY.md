@@ -18,7 +18,7 @@
 
 ### Evaluated Candidate Model (not deployed)
 - `agrimind_mobilenetv2_v2.pth` (15-class, MobileNetV2, retrained on the same source data with leakage-controlled splitting)
-- **- **Top-1 accuracy: 95.27%** on 3,106 held-out images evaluated under Scenario B's documented duplicate-exclusion protocol
+- **Top-1 accuracy: 95.27%** on 3,106 held-out images evaluated under Scenario B's documented duplicate-exclusion protocol
 - Top-3: 99.48%; Macro-F1: 0.9508; Weighted-F1: 0.9529
 - All 15 supported classes have per-class F1 >= 0.89
 
