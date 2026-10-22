@@ -5,9 +5,10 @@
 
 ## Access
 
-- **URL:** https://drive.google.com/file/d/https://drive.google.com/file/d/1yrdS5Z6VlZanh7Q0tbapuWhPXnCOua5i/view?usp=sharing/view
+- **URL:** https://drive.google.com/file/d/1yrdS5Z6VlZanh7Q0tbapuWhPXnCOua5i/view?usp=sharing
 - **Permission:** Anyone with the link can view
 
 ## Contents
 
 End-to-end demo: Login → Upload leaf image → Diagnosis → Recommendation
+

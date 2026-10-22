@@ -11,5 +11,5 @@ Excluded from Git due to size (9.2 MB each). Available externally.
 
 ## Access
 
-- **Download URL:** https://drive.google.com/drive/folders/YOUR_FOLDER_ID
+- **Download URL:** https://drive.google.com/drive/folders/1e3WMYTtM7cgJ-ZA3w6IzMSa109BuCxZv?usp=sharing
 - **Verify with:** `Get-FileHash <file> -Algorithm SHA256` should match the SHA256 column
