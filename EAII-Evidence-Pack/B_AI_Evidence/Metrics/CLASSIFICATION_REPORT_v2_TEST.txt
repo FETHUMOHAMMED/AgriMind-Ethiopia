@@ -80,8 +80,7 @@ LIMITATIONS:
     ARCs (Jimma, Melkassa, Kulumsa, Debre Zeit, Areka) under Tier 2/3
     verification protocol (PCR/culture lab confirmation).
   - This evaluation covers the 15-class scope only.
-  - Path-level split separation was verified; image-level duplicate
-    detection (perceptual hashing) was not performed.
+  
 
 ================================================================================
 PERCEPTUAL-HASH + SHA-256 DUPLICATE AUDIT
