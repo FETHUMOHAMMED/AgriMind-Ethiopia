@@ -18,7 +18,7 @@
 
 ### Evaluated Candidate Model (not deployed)
 - `agrimind_mobilenetv2_v2.pth` (15-class, MobileNetV2, retrained on the same source data with leakage-controlled splitting)
-- **Top-1 accuracy: 95.27%** on 3,106 held-out leakage-controlled test images
+- **- **Top-1 accuracy: 95.27%** on 3,106 held-out images evaluated under Scenario B's documented duplicate-exclusion protocol
 - Top-3: 99.48%; Macro-F1: 0.9508; Weighted-F1: 0.9529
 - All 15 supported classes have per-class F1 >= 0.89
 
@@ -39,7 +39,18 @@
 | Scenario A (3 byte-identical test duplicates excluded) | 3,111 | 95.27% | 99.49% | 0.9508 | 0.9530 |
 | Scenario B (3 test duplicates + 5 same-leaf candidates excluded) | 3,106 | 95.27% | 99.48% | 0.9508 | 0.9529 |
 
-**Interpretation:** the held-out result is stable across leakage controls. Removing all identified duplicate candidates changes Top-1 accuracy by 0.01 percentage points ? well below the reporting precision. The Scenario B result (95.27% on 3,106 fully leakage-controlled images) is the recommended authoritative number for EAII.
+**Interpretation:** 
+Scenario B achieved 95.27% Top-1 accuracy on 3,106 held-out images 
+after excluding three confirmed byte-identical test-set duplicates and 
+five additional suspected same-leaf candidates. 
+The result is stable relative to the original test evaluation at 
+the reported precision. This is a partial leakage-control sensitivity 
+analysis, not proof that all dataset leakage has been eliminated. 
+One byte-identical duplicate was identified across the original training 
+and validation partitions; its effect on validation metrics and checkpoint 
+selection has not been independently quantified. 
+The evaluation uses public-dataset-derived images and does not establish 
+diagnostic accuracy on Ethiopian farms.
 
 ### Duplicate Audit
 - **Test-set leakage:** 3 confirmed byte-identical duplicates (SHA-256 match). Documented in all reports.
