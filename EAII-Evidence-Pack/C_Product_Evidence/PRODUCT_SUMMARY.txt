@@ -34,4 +34,4 @@ Access:
 - Chrome: http://localhost:8000 (same PC)
 - Phone: http://192.168.8.4:8000 (same WiFi)
 
-Status: Working MVP — ready for field validation
+Status: Working MVP; ready to begin field validation. Ethiopian field performance has not yet been validated.

@@ -28,8 +28,13 @@ v2 — Evaluated candidate (not deployed)
 - Training method: pipeline-fixed script (10 epochs, last 2 MobileNet blocks
   + classifier unfrozen, deterministic splits.json with seed 42, no 5,000-image cap)
 - Validation accuracy: 95.28% (best epoch during training)
-- TEST accuracy: 95.27% top-1 on 3,106 held-out leakage-controlled images
-  (byte-for-byte reproducible — SHA256 E45079C2D74A0DFFD95F87E025A9E8D9B84372796C5975CBD908904906A0D1CD)
+- TEST accuracy: 95.27% top-1 on 3,106 held-out images evaluated under
+  Scenario B's documented duplicate-exclusion protocol
+- Evaluation report reproducibility: byte-for-byte reproducible given the
+  preserved split (splits_scenarioB.json), checkpoint (SHA256 5d17fede...),
+  and preprocessing — report SHA256 E45079C2D74A0DFFD95F87E025A9E8D9B84372796C5975CBD908904906A0D1CD
+  (This establishes reproducibility of the EVALUATION REPORT, not independent
+  reproduction of the full model-training pipeline.)
 - Top-3: 99.48% | Macro F1: 0.9508 | Weighted F1: 0.9529
 - Excludes 4 rare diseases due to insufficient training data:
   coffee___leaf_rust (4 images), maize___common_rust (3),
