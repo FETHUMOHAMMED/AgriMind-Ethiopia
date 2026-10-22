@@ -48,7 +48,8 @@ represent the SAME 20,669 public images duplicated three times. It represents:
 WHAT IS SUPPORTED
 --------------------------------------------------------------------------------
 - Model evaluation on a held-out public-dataset split:   YES
-  (95.27% top-1 on 3,106 leakage-controlled images,
+    (95.27% top-1 on 3,106 held-out images evaluated under
+   Scenario B's documented duplicate-exclusion protocol,
    documented in CLASSIFICATION_REPORT_v2_TEST_SCENARIOB.txt)
 
 - Model evaluation on Ethiopian farm imagery:            NO
