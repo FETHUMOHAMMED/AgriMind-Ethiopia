@@ -1,2 +1,4 @@
 ﻿source,status,total_images,num_classes,classes,has_splits,license,notes
-kaggle_yilikalfikru,VERIFIED,2424,5,"FHB:533;stripe_rust:519;septoria:505;healthy:486;leaf_rust:381",true,CC BY 4.0,"FHB has 532 LabelMe annotations (spike bounding boxes); 38 jfif + 15 webp need conversion"
+kaggle_yilikalfikru,VERIFIED,2424,5,"FHB:533;stripe_rust:519;septoria:505;healthy:486;leaf_rust:381",true,CC BY 4.0,"FHB has 532 LabelMe annotations; 38 jfif + 15 webp need conversion"
+kaggle_olyadgetch_holeta,VERIFIED,407,3,"healthy:~102;septoria:~97;stripe_rust:~208",false,copyright-authors,"Ethiopian field data from Holeta wheat farm; Canon EOS 5D Mark III high-res; expert-labeled"
+mendeley_wheat_disease,EXCLUDED,1603,5,"BlackPoint:303;FusariumFootRot:250;HealthyLeaf:250;LeafBlight:400;WheatBlast:400",true,unknown,"CONFIRMED BANGLADESH via README.txt; no stripe rust; no septoria; augmented leakage risk"

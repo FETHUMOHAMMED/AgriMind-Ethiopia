@@ -22,29 +22,32 @@ upgraded to ✅ VERIFIED.
 
 ## 1. Wheat
 
-| Class | On-disk (verified) | Kaggle verified | Mendeley | Zenodo | Total verified | Trainable now? |
-|---|---:|---:|---:|---:|---:|---|
-| FHB (Fusarium Head Blight) | 0 | **533** ✅ | 🔴 Not downloaded | 🔴 Not downloaded | **533** | ✅ **Yes** |
-| stripe_rust | 0 | **519** ✅ | 🔴 Not downloaded | 🔴 Not downloaded | **519** | ✅ **Yes** |
-| septoria | 0 | **505** ✅ | 🔴 Not downloaded | 🔴 Not downloaded | **505** | ✅ **Yes** |
-| healthy | 0 | **486** ✅ | 🔴 Not downloaded | 🔴 Not downloaded | **486** | ✅ **Yes** |
-| leaf_rust | 3 | **381** ✅ | 🔴 Not downloaded | 🔴 Not downloaded | **384** | ✅ **Yes** |
-| yellow_rust | 0 | 0 | 🔴 Not downloaded | 🔴 Not downloaded | 0 | 🟡 Pending Zenodo |
+**Verified sources (Phase A complete):**
 
-**Phase B decision:** ✅ **PROCEED**. Kaggle dataset alone provides 5 classes with 381–533 images each, pre-split into train/val/test, CC BY 4.0 license. FHB images have LabelMe spike annotations (not needed for classification but useful for future object detection).
+| Source | Location | Classes | Images | License | Status |
+|---|---|---|---|---:|---|---|
+| Kaggle `yilikalfikru` | Unclear origin | FHB, healthy, leaf_rust, septoria, stripe_rust | 2,424 | CC BY 4.0 | ✅ Verified |
+| **Kaggle `olyadgetch` (Holeta)** | **Ethiopia 🇪🇹** | healthy, septoria, stripe_rust | **407** | copyright-authors | ✅ **Verified** |
 
-**Dataset details:**
-- Source: Kaggle `yilikalfikru/wheat-leaf-disease-dataset-for-dl-classification`
-- License: CC BY 4.0
-- Size: 2,121 MB (2,424 files)
-- Resolution: ~2000×2000 pixels (896 KB avg per image)
-- Format: 96% jpg/png, 38 .jfif + 15 .webp need handling in training pipeline
+**Per-class breakdown:**
 
-**Remaining considerations:**
-- Mendeley Ethiopian field data (407 images, Holeta) — pending download — will add field validation
-- Zenodo John Innes (999 images) — pending download — will add yellow_rust + mildew classes
-- Pre-split provided by Kaggle — should NOT be trusted blindly; will verify no cross-split duplicates
+| Class | Kaggle (2,424) | Holeta (407) | Combined | Ethiopian field validation? |
+|---|---:|---:|---:|---|
+| FHB | 533 | — | 533 | ❌ No Holeta images |
+| stripe_rust | 519 | ~208 | ~727 | ✅ Yes |
+| septoria | 505 | ~97 | ~602 | ✅ Yes |
+| healthy | 486 | ~102 | ~588 | ✅ Yes |
+| leaf_rust | 381 | — | 381 | ❌ No Holeta images |
 
+**Phase B decision:** ✅ **PROCEED** with the three-class subset (healthy, septoria, stripe_rust) as the primary Phase B model. This gives:
+- **Training set:** 1,510 images (Kaggle: healthy 486 + septoria 505 + stripe_rust 519)
+- **Ethiopian field validation set:** 407 images (Holeta — real Ethiopian farm data)
+- **Transfer test:** Public dataset → Ethiopian field — the exact claim EAII needs
+
+**Option to extend:** also train a 5-class model (adds FHB, leaf_rust) with the caveat that FHB and leaf_rust have no Ethiopian field validation data.
+
+**Excluded dataset:**
+- Mendeley "Wheat Disease" (Bangladesh) — ⛔ Not Ethiopian, no stripe rust, no septoria, contains augmented leakage risk
 ---
 
 ## 2. Maize
