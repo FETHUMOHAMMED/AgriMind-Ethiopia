@@ -1,0 +1,2 @@
+﻿source,status,total_images,num_classes,classes,has_splits,license,notes
+kaggle_yilikalfikru,VERIFIED,2424,5,"FHB:533;stripe_rust:519;septoria:505;healthy:486;leaf_rust:381",true,CC BY 4.0,"FHB has 532 LabelMe annotations (spike bounding boxes); 38 jfif + 15 webp need conversion"

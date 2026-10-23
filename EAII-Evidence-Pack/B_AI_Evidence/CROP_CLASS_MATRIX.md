@@ -22,16 +22,28 @@ upgraded to ✅ VERIFIED.
 
 ## 1. Wheat
 
-| Class | On-disk (verified) | Public source | Public count | Trainable now? | Blocker |
-|---|---:|---|---:|---|---|
-| healthy | 0 | PlantVillage / Kaggle / Mendeley | 🟡 TO VERIFY | 🔴 Pending | Data sourcing |
-| brown_rust | 3 | PlantVillage | 🟡 TO VERIFY | 🔴 Pending | Data sourcing |
-| yellow_rust | 0 | PlantVillage | 🟡 TO VERIFY | 🔴 Pending | Data sourcing |
-| stem_rust | 0 | (Ethiopian variety) | 🔴 UNKNOWN | ⛔ Field required | No known public source |
-| septoria | 0 | PlantVillage | 🟡 TO VERIFY | 🔴 Pending | Data sourcing |
+| Class | On-disk (verified) | Kaggle verified | Mendeley | Zenodo | Total verified | Trainable now? |
+|---|---:|---:|---:|---:|---:|---|
+| FHB (Fusarium Head Blight) | 0 | **533** ✅ | 🔴 Not downloaded | 🔴 Not downloaded | **533** | ✅ **Yes** |
+| stripe_rust | 0 | **519** ✅ | 🔴 Not downloaded | 🔴 Not downloaded | **519** | ✅ **Yes** |
+| septoria | 0 | **505** ✅ | 🔴 Not downloaded | 🔴 Not downloaded | **505** | ✅ **Yes** |
+| healthy | 0 | **486** ✅ | 🔴 Not downloaded | 🔴 Not downloaded | **486** | ✅ **Yes** |
+| leaf_rust | 3 | **381** ✅ | 🔴 Not downloaded | 🔴 Not downloaded | **384** | ✅ **Yes** |
+| yellow_rust | 0 | 0 | 🔴 Not downloaded | 🔴 Not downloaded | 0 | 🟡 Pending Zenodo |
 
-**Phase B decision:** Pending data verification (target: ≥100 usable images/class
-after deduplication and label audit).
+**Phase B decision:** ✅ **PROCEED**. Kaggle dataset alone provides 5 classes with 381–533 images each, pre-split into train/val/test, CC BY 4.0 license. FHB images have LabelMe spike annotations (not needed for classification but useful for future object detection).
+
+**Dataset details:**
+- Source: Kaggle `yilikalfikru/wheat-leaf-disease-dataset-for-dl-classification`
+- License: CC BY 4.0
+- Size: 2,121 MB (2,424 files)
+- Resolution: ~2000×2000 pixels (896 KB avg per image)
+- Format: 96% jpg/png, 38 .jfif + 15 .webp need handling in training pipeline
+
+**Remaining considerations:**
+- Mendeley Ethiopian field data (407 images, Holeta) — pending download — will add field validation
+- Zenodo John Innes (999 images) — pending download — will add yellow_rust + mildew classes
+- Pre-split provided by Kaggle — should NOT be trusted blindly; will verify no cross-split duplicates
 
 ---
 
