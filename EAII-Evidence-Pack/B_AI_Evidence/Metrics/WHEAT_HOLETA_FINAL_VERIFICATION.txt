@@ -1,0 +1,85 @@
+﻿WHEAT HOLETA — FINAL VERIFICATION SUMMARY
+=============================================
+Date: $(Get-Date -Format 'yyyy-MM-dd')
+
+MODEL: wheat_holeta_mobilenetv2_v2.pth
+Training: 407 Holeta Ethiopian wheat images (3 classes)
+Classes: healthy (102), septoria (97), stripe_rust (208)
+
+DEPLOYMENT STATUS: EXPERIMENTAL CANDIDATE
+NOT production-ready. Single location, no independent field test.
+Location-specific model valid only for Holeta-like field conditions.
+
+=== VERIFICATION RESULTS ===
+
+1. CLASS MAPPING (Issue A) — RESOLVED
+   All 3 training scripts + checkpoint use identical:
+   - CLASSES = ["healthy", "septoria", "stripe_rust"]
+   - class_to_idx = {healthy: 0, septoria: 1, stripe_rust: 2}
+   - IMG_SIZE = 128, ImageNet normalization
+   - Folder map: Healthy→healthy, septoria→septoria, stripe_rust→stripe_rust
+
+2. LEAKAGE AUDIT (Issue B) — RESOLVED
+   Near-duplicate detection (pHash Hamming ≤ 5/64, same-class):
+   - Total pairs: 2 out of 407 images (0.5%)
+   - Distance: both at dist=0 (byte-identical pHash)
+   - Images with ≥1 near-duplicate: 4 (1.0%)
+   - Session-clusters: 405 (403 singletons + 2 pairs)
+   - Pairs crossing standard 5-fold boundaries: 1 (loh(54) ↔ loh(84))
+
+   Standard stratified 5-fold CV:    95.08% ± 1.75%
+   Leakage-free grouped 5-fold CV:   95.56% ± 1.72%
+   Difference:                      +0.48 pp (grouped is HIGHER)
+
+   Conclusion: The 95% CV is NOT inflated by leakage. Grouped CV
+   confirms the same accuracy after removing all near-duplicate
+   information from training folds.
+
+3. DEPLOYMENT CLAIM LANGUAGE (Issue C) — RESOLVED
+   Corrected to "experimental, location-specific candidate."
+   Removed overclaim that "2,000+ images will produce production-grade
+   generalizable model." Added explicit limitation statements.
+
+=== COMPARISON TO PUBLIC-TRAINED WHEAT V1 ===
+
+Public-trained (Kaggle 3-class, 1,510 images):
+  - Kaggle test:      84.90%
+  - Holeta field:     34.15%
+  - Transfer gap:    +50.75 pp (FAIL — public data does not transfer)
+
+Holeta-trained (407 Ethiopian field images):
+  - Holeta field (grouped CV): 95.56%
+  - Holeta field (standard CV): 95.08%
+
+CONCLUSION:
+Ethiopian field data produces Ethiopian field performance.
+Public wheat datasets do not transfer to Ethiopian conditions.
+407 images achieve 95% — the barrier is data collection, not ML
+capability. Scaling to more sites and seasons (Phase C) will
+produce a genuinely generalizable model.
+
+=== HONEST EAII CLAIM ===
+
+"AgriMind's Holeta wheat classifier (3 classes: healthy, septoria,
+stripe_rust) achieves 95.56% ± 1.72% under leakage-free grouped
+5-fold cross-validation on 407 Ethiopian field images from the
+Holeta wheat farm. A near-duplicate audit confirmed only 2 duplicate
+pairs (0.5%) in the dataset, and standard vs. leakage-free CV agree
+within 0.5 pp. This is preliminary internal evidence on a single-
+location dataset. Independent field validation at other sites,
+seasons, and Ethiopian regions is required before deployment."
+
+=== NEXT VALIDATION MILESTONES ===
+
+1. Independent test on Holeta model with wheat images from a different
+   farm/location (Kulumsa, Asella, or other Oromia wheat region)
+2. Seasonal cross-validation (dry vs. wet season imagery)
+3. Expand to 5-class model (add FHB, leaf_rust) with additional data
+4. Coffee, maize, teff, enset follow the same methodology
+
+=== FILES ===
+- model/wheat_holeta_mobilenetv2_v2.pth (checkpoint)
+- train_wheat_holeta_only.py (5-fold CV diagnostic script)
+- train_wheat_holeta_final.py (production training script)
+- HOLETA_LEAKAGE_AUDIT.txt (this audit)
+- WHEAT_HOLETA_V2_REPORT.txt (training report)

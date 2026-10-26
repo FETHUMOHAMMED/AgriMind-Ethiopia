@@ -1,0 +1,24 @@
+HOLETA LEAKAGE AUDIT
+============================================================
+
+Dataset: 407 Holeta Ethiopian wheat images (3 classes)
+Near-duplicate threshold: pHash Hamming <= 5/64 (same-class only)
+
+RESULTS:
+  Total images:                        407
+  Images with >=1 near-duplicate:      4 (1.0%)
+  Near-duplicate pairs:                2
+  Unique session-clusters:             405
+  Largest cluster size:                2
+  Images in multi-image clusters:      4
+
+STANDARD STRATIFIED 5-FOLD CV (seed=42):
+  Near-duplicate pairs crossing folds: 1 / 2
+  Leakage rate:                        50.0%
+
+INTERPRETATION:
+  1 near-duplicate pair(s) crossed fold boundaries.
+  Leakage rate: 50.0%
+  Impact on 95.08% CV: 1/407 = 0.25% of test images potentially inflated.
+  Given only 2 total near-duplicate pairs and 1 crossing folds,
+  the impact is likely small (max ~0.2pp on accuracy).
