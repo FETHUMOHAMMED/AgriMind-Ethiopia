@@ -25,12 +25,20 @@ Class-mapping verification: PASS
   IMG_SIZE=128, ImageNet normalization.
 
 Leakage audit:
-  - Near-duplicate pairs detected: 2 (0.5% of dataset)
-  - Images with ≥1 near-duplicate: 4 (1.0%)
-  - Pairs crossing standard 5-fold folds: 1
-  - Maximum possible CV inflation: 0.25 pp
-  - Grouped CV (removes all cluster information from training folds):
-    95.56% — HIGHER than standard CV, confirming leakage is negligible
+  - Near-duplicate pairs detected (pHash Hamming <= 5/64, same-class): 2
+  - Images with >=1 near-duplicate: 4 (1.0% of dataset)
+  - Detected pairs crossing standard 5-fold boundaries: 1
+  - Grouped CV (with detected clusters removed from training folds):
+    95.56% +/- 1.72%  (vs standard 95.08% +/- 1.75%)
+
+Interpretation of leakage audit:
+  The grouped-CV experiment did not lower the measured mean accuracy,
+  which is consistent with the two DETECTED near-duplicate pairs not
+  accounting for the model's internal accuracy. This does NOT establish
+  that leakage is negligible in general. Perceptual hashing detects only
+  visual near-duplicates. Same-plant, same-plot, or same-session images
+  photographed from different angles would not be detected by this
+  method. The magnitude of leakage from such sources is unknown.
 
 Reproducibility (verified via second run with seed=42):
   - Fold assignments identical across runs

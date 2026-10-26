@@ -27,3 +27,24 @@ LIMITATIONS:
      True session-based grouping requires metadata we do not have.
   3. Grouped CV estimates within-dataset generalization only. It does
      NOT estimate generalization to other farms, seasons, or regions.
+
+================================================================================
+SCOPE OF REPRODUCIBILITY VERIFICATION
+================================================================================
+This verification confirms:
+  - Fold assignments are deterministic given seed=42 and sorted inputs
+  - Detected duplicate clusters remain within single folds
+  - Per-fold class representation is balanced
+  - Model is freshly initialized per fold (no weight carryover)
+
+This verification does NOT confirm:
+  - Full training reproducibility across hardware or software versions
+  - Data-loader ordering stability across PyTorch versions
+  - Numerical determinism of CPU/GPU floating-point operations
+  - Behavior under different torchvision or PIL versions
+
+Full reproducibility requires pinning all dependency versions (torch,
+torchvision, PIL, numpy, scikit-learn) and running on identical hardware.
+That pinning is recommended for any future production training pipeline.
+
+================================================================================
