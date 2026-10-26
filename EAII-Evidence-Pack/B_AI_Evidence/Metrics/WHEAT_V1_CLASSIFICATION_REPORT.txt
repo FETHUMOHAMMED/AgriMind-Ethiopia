@@ -1,0 +1,46 @@
+AgriMind Wheat v1 — Phase B Training Report
+============================================================
+
+Model: MobileNetV2, 3-class subset (healthy, septoria, stripe_rust)
+Training: 1013 Kaggle images
+Validation: 250 Kaggle images
+Best epoch: 2, best val_acc: 86.00%
+
+[1] KAGGLE TEST SET (245 images, PUBLIC):
+  Accuracy: 84.90%
+  Macro F1: 0.8418
+
+              precision    recall  f1-score   support
+
+     healthy     0.9186    0.9875    0.9518        80
+    septoria     0.7407    0.9756    0.8421        82
+ stripe_rust     0.9608    0.5904    0.7313        83
+
+    accuracy                         0.8490       245
+   macro avg     0.8734    0.8512    0.8418       245
+weighted avg     0.8734    0.8490    0.8404       245
+
+
+[2] HOLETA ETHIOPIAN FIELD SET (407 images, REAL FARM DATA):
+  Accuracy: 34.15%
+  Macro F1: 0.3299
+
+              precision    recall  f1-score   support
+
+     healthy     0.9444    0.3333    0.4928       102
+    septoria     0.2687    1.0000    0.4236        97
+ stripe_rust     0.8000    0.0385    0.0734       208
+
+    accuracy                         0.3415       407
+   macro avg     0.6710    0.4573    0.3299       407
+weighted avg     0.7096    0.3415    0.2620       407
+
+
+TRANSFER GAP: +50.75 pp (public → Ethiopian field)
+
+HONEST LIMITATIONS:
+- Kaggle dataset origin unclear (unverified for Ethiopian conditions)
+- Holeta: 407 images from single location, single season
+- 3-class subset only — FHB, leaf_rust not evaluated on Ethiopian field
+- Model not tested beyond these two datasets
+- Treatment recommendations require agronomist review (no clinical validation)

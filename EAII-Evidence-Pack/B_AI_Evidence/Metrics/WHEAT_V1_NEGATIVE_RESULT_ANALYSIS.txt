@@ -1,0 +1,40 @@
+﻿WHEAT V1 — NEGATIVE RESULT SUMMARY
+=====================================
+
+Date: 2026-10-24
+Training data: Kaggle yilikalfikru wheat dataset (3-class subset)
+  1,013 train / 250 val / 245 test images
+Test 1: Kaggle test set (public, 245 images) = 84.90% top-1
+Test 2: Holeta Ethiopian field (407 images) = 34.15% top-1
+Transfer gap: +50.75 pp (public → Ethiopian field)
+
+PER-CLASS FAILURE MODES:
+  healthy:    P=0.9444, R=0.3333 (misses 67% of healthy — over-predicts septoria)
+  septoria:   P=0.2687, R=1.0000 (predicts septoria for 88% of ALL images)
+  stripe_rust: P=0.8000, R=0.0385 (misses 96% of stripe rust)
+
+ROOT CAUSES:
+1. Kaggle dataset label noise — stripe_rust already had recall=0.59 on its own test set
+   (suggesting label ambiguity between septoria and stripe_rust)
+2. Domain shift — Kaggle avg 896 KB/image vs Holeta avg 3,647 KB/image
+   (Holeta is raw Canon EOS 5D; different camera, lighting, growth stage, variety)
+3. Bias amplification — septoria was highest-recall class on Kaggle test,
+   collapsed to 100% recall / 27% precision on Holeta
+
+CONCLUSION:
+  ❌ Public wheat data does NOT transfer to Ethiopian field conditions
+  ❌ 34.15% is essentially random for 3-class classification
+  ✅ This VALIDATES the two-mode pilot decision (wheat = workflow-only, NOT AI)
+  ✅ This VALIDATES Phase C field collection as mandatory, not optional
+
+ACTION:
+  DO NOT DEPLOY wheat v1 model to production
+  Report this honestly in EAII submission
+  Recommend Phase C field collection as priority for wheat
+
+RECOMMENDED EAII CLAIM:
+  "Public wheat datasets do not transfer to Ethiopian field conditions.
+   A model trained on 1,510 public images achieves 84.9% on a public test set
+   but only 34.2% on 407 Ethiopian Holeta field images — a 50.75pp transfer
+   gap. This evidence justifies the Phase C field-collection priority: wheat
+   AI requires Ethiopian training data, not just public data."
