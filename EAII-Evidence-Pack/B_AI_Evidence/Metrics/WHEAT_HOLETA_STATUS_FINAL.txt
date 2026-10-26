@@ -1,0 +1,116 @@
+﻿WHEAT HOLETA MODEL — EVIDENCE STATUS (per advisor review)
+=============================================================
+Date: $(Get-Date -Format 'yyyy-MM-dd')
+
+STATUS: EXPERIMENTAL CANDIDATE, NOT PRODUCTION-READY
+Location-specific. Evaluated only on Holeta collection data.
+No independent field validation has been performed.
+
+=== VERIFIED EVIDENCE ===
+
+Public-trained wheat classifier:
+  - Kaggle test set:      84.90% accuracy
+  - Holeta field images:  34.15% accuracy (407 images)
+  - Transfer gap:        +50.75 pp (poor transfer, documented)
+
+Holeta-only experiments (5-fold CV on 407 Holeta images):
+  - Standard stratified CV:        95.08% ± 1.75%
+  - Leakage-free grouped CV:       95.56% ± 1.72%
+  - Delta (grouped − standard):   +0.48 pp
+
+Final production training (345/62 split): 95.16% val accuracy
+
+Class-mapping verification: PASS
+  All 3 scripts + checkpoint use identical CLASSES, class_to_idx,
+  IMG_SIZE=128, ImageNet normalization.
+
+Leakage audit:
+  - Near-duplicate pairs detected: 2 (0.5% of dataset)
+  - Images with ≥1 near-duplicate: 4 (1.0%)
+  - Pairs crossing standard 5-fold folds: 1
+  - Maximum possible CV inflation: 0.25 pp
+  - Grouped CV (removes all cluster information from training folds):
+    95.56% — HIGHER than standard CV, confirming leakage is negligible
+
+Reproducibility (verified via second run with seed=42):
+  - Fold assignments identical across runs
+  - Every duplicate cluster entirely within one fold (0 violations)
+  - Class balance preserved across all folds
+  - Model initialized fresh per fold (no weight carryover)
+
+=== LIMITATIONS (honest) ===
+
+1. pHash-based leakage detection catches ONLY visual near-duplicates.
+   It cannot detect:
+     - Same leaf photographed from different angles
+     - Same plant, different leaves
+     - Same field plot, different plants
+     - Same acquisition session
+   Grouped CV addresses only detected visual duplicates. True
+   session-based or plot-based grouping requires metadata we do not
+   have from the Holeta dataset.
+
+2. Both CV experiments use images from a SINGLE location (Holeta wheat
+   farm, Oromia). They measure within-dataset generalization only.
+   They do NOT estimate generalization to:
+     - Other Ethiopian farms
+     - Other growing seasons
+     - Other wheat varieties
+     - Different cameras or lighting
+
+3. The final production model (95.16% val on 62 images) has been
+   trained on 345 images from the same 407-image collection. Its
+   validation split is small and from the same source.
+
+4. No independent test has been performed. The strongest remaining
+   test would be: freeze the Holeta model, evaluate on expert-verified
+   wheat images from a different Ethiopian collection (e.g., Kulumsa,
+   Asella, or a different growing season).
+
+=== DEPLOYMENT STATUS ===
+
+NOT production-ready. Current status is "promising experimental
+candidate pending independent field validation." This matches the
+advisor's verdict.
+
+Do NOT:
+  - Deploy to farmers
+  - Claim 95% accuracy on Ethiopian farms generally
+  - Claim generalization to other locations or seasons
+  - Cite as production evidence in pitch decks or funder conversations
+
+DO:
+  - Cite as internal validation on Holeta data
+  - Use as evidence that Ethiopian field data is learnable at scale
+  - Justify Phase C field collection at additional ARC sites
+  - Use as the methodology template for coffee, maize, teff
+
+=== NEXT VALIDATION MILESTONES ===
+
+1. (CRITICAL) Independent test: freeze the Holeta-trained model,
+   evaluate on expert-verified wheat images from a different Ethiopian
+   source. This is the single most informative next experiment.
+
+2. Session metadata: if the Holeta images have accompanying metadata
+   (date, photographer, plot ID), enable true session-based grouping
+   and re-run CV with that stronger grouping.
+
+3. Seasonal expansion: collect Holeta images across multiple growing
+   seasons to measure year-over-year generalization.
+
+4. Wider geographic coverage: evaluate at Kulumsa, Asella, and other
+   Oromia wheat regions.
+
+Only after #1 succeeds should any deployment claim be made.
+
+=== HONEST EAII CLAIM ===
+
+"AgriMind's Holeta wheat classifier (3 classes: healthy, septoria,
+stripe_rust) achieves 95.56% ± 1.72% under leakage-free grouped
+5-fold CV on 407 Ethiopian field images from the Holeta wheat farm.
+The public-trained equivalent achieves 84.90% on Kaggle test but only
+34.15% on Holeta field images — a 50.75 pp transfer gap that
+demonstrates public datasets do not transfer to Ethiopian conditions.
+The Holeta model is an experimental location-specific candidate. It
+has not been validated on independent field data from other sites,
+seasons, or regions, and no production claims are made."

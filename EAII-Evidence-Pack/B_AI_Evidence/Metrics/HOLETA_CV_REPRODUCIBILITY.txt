@@ -1,0 +1,29 @@
+HOLETA GROUPED-CV REPRODUCIBILITY VERIFICATION
+============================================================
+
+Seed: 42
+Fold assignments deterministic: True
+Cluster-isolation violations: 0
+
+FOLD CLASS DISTRIBUTION:
+  Fold 1: {1: 20, 2: 42, 0: 21} | total=83
+  Fold 2: {1: 20, 2: 42, 0: 20} | total=82
+  Fold 3: {2: 42, 0: 21, 1: 19} | total=82
+  Fold 4: {2: 41, 0: 20, 1: 19} | total=80
+  Fold 5: {2: 41, 0: 20, 1: 19} | total=80
+
+MULTI-MEMBER CLUSTERS:
+  Cluster 66: ['lolr(183).JPG', 'lolr(197).JPG'] ? fold 5
+  Cluster 395: ['loh(54).JPG', 'loh(84).JPG'] ? fold 3
+
+MODEL INITIALIZATION:
+  Each fold creates a fresh MobileNetV2 instance from ImageNet weights.
+  No weight carryover between folds.
+
+LIMITATIONS:
+  1. pHash detects visual similarity only ? cannot detect same-plant,
+     same-plot, or same-session photographs taken from different angles.
+  2. Grouping is by detected near-duplicate, NOT by plant/plot/session.
+     True session-based grouping requires metadata we do not have.
+  3. Grouped CV estimates within-dataset generalization only. It does
+     NOT estimate generalization to other farms, seasons, or regions.
