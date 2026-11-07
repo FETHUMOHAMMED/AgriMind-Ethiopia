@@ -1,0 +1,15 @@
+ETHIOPIAN COFFEE ? TRAIN?TEST LEAKAGE AUDIT
+============================================================
+
+Train items: 10800 (8509 augmented)
+Test items:  1200
+
+Test images with train near-duplicate: 870 / 1200
+  Same-class:   868
+  Cross-class:  2
+  Leakage rate: 72.5%
+
+INTERPRETATION:
+  ?? SIGNIFICANT train?test leakage detected.
+  The provided train/test split is contaminated.
+  We MUST re-split from originals, not use provided splits.

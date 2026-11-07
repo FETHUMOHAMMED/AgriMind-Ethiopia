@@ -1,6 +1,8 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr
 
 class UserRegister(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     full_name: str
     email: EmailStr          # automatically validates email format
     password: str

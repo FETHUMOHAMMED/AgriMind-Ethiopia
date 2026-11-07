@@ -1,0 +1,34 @@
+AgriMind Wheat Holeta v2 — Production Training Report
+============================================================
+
+Model: MobileNetV2, 3-class (healthy, septoria, stripe_rust)
+Training data: 407 Ethiopian field images from Holeta wheat farm
+Provenance: Kaggle olyadgetch/wheat-leaf-dataset (mirrors Mendeley Holeta)
+Camera: Canon EOS 5D Mark III
+Labels: Expert-verified with plant pathologists
+
+Train/val split: 345 / 62
+Best val_acc: 95.16% at epoch 2
+
+5-FOLD CV EVIDENCE (from diagnostic run):
+  Mean accuracy: 95.08% (±1.75%)
+  Fold accuracies: 97.56, 95.12, 93.83, 92.59, 96.30
+
+TRANSFER CONTEXT:
+  Same 3 classes trained on 1,510 public Kaggle images:
+    - Kaggle test: 84.90%
+    - Holeta field: 34.15% (FAIL)
+
+  Trained on Holeta field images:
+    - Holeta field (5-fold CV): 95.08% (PASS)
+
+CONCLUSION:
+  Ethiopian field data is essential for Ethiopian field performance.
+  407 images achieve 95% — the barrier is data collection, not ML capability.
+
+DEPLOYMENT LIMITATIONS:
+  - Single location (Holeta, Oromia)
+  - Likely single growing season
+  - 3 classes only (FHB, leaf_rust not covered)
+  - Not tested at other Ethiopian sites
+  - Treatment recommendations require agronomist review

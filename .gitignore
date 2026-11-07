@@ -233,3 +233,6 @@ EAII-Evidence-Pack/C_Product_Evidence/Demo_Video/*.mp4
 
 # Large video files (share via external link)
 EAII-Evidence-Pack/C_Product_Evidence/Demo_Video/*.mp4
+
+# Phase A raw data (large, regenerable, provenance in verification CSVs)
+data/raw/

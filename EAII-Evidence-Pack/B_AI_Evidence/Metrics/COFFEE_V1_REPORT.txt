@@ -1,0 +1,37 @@
+AgriMind Coffee v1 — Phase B Report
+============================================================
+
+Training: 1770 unique images (4 classes)
+Val:      379 images
+Test:     380 images
+
+Split method: grouped by pHash session-clusters (leakage-free)
+Best val_acc: 94.46% at epoch 10
+
+TEST SET RESULTS:
+  Top-1 accuracy: 93.42%
+  Macro F1:       0.9328
+
+              precision    recall  f1-score   support
+
+  cercospora     0.9868    0.8523    0.9146        88
+     healthy     0.9385    0.9919    0.9644       123
+   leaf_rust     0.8850    0.9346    0.9091       107
+       phoma     0.9508    0.9355    0.9431        62
+
+    accuracy                         0.9342       380
+   macro avg     0.9403    0.9286    0.9328       380
+weighted avg     0.9366    0.9342    0.9338       380
+
+
+Data provenance: Kaggle 'metadata-enhanced-coffee-disease-benchmark'
+  Ethiopian subset only (raw_ethiopian)
+  Originals only (no augmented copies)
+  pHash-deduplicated (Hamming <= 5)
+
+LIMITATIONS:
+  - Original train/test split from Kaggle had 72.5% leakage (unusable)
+  - Rebuilt split from originals with grouped CV
+  - No region/location metadata available
+  - Not independently validated on other Ethiopian coffee regions
+  - Treatment recommendations require agronomist review

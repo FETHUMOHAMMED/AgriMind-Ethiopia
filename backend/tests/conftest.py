@@ -9,11 +9,18 @@ Both patches happen at MODULE LOAD TIME, before test modules import app.main.
 """
 import shutil
 import tempfile
+import os
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
+
+# Tests run in an explicitly controlled non-production environment. This is
+# set before importing application modules because JWT configuration is now
+# intentionally fail-closed when ENVIRONMENT is absent or unsupported.
+os.environ.setdefault("ENVIRONMENT", "test")
+os.environ.setdefault("AGRIMIND_TESTING", "1")
 
 # ============================================================
 # MODULE-LEVEL PATCHES — run before any test module imports
@@ -27,6 +34,15 @@ _test_url = f"sqlite:///{_temp_db.as_posix()}"
 _test_engine = create_engine(
     _test_url, connect_args={"check_same_thread": False}
 )
+
+
+@event.listens_for(_test_engine, "connect")
+def _enable_test_sqlite_foreign_keys(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    try:
+        cursor.execute("PRAGMA foreign_keys=ON")
+    finally:
+        cursor.close()
 _test_session = sessionmaker(
     autocommit=False, autoflush=False, bind=_test_engine
 )
@@ -43,8 +59,9 @@ _temp_uploads_dir = Path(tempfile.mkdtemp(prefix="agrimind_uploads_"))
 import app.routes.predict as _predict_module
 _predict_module.UPLOAD_DIR = str(_temp_uploads_dir)
 
-# Now safe to import app.main — its create_all runs on test engine,
-# and any prediction uploads go to the temp dir
+# Now safe to import app.main: test mode permits the application to load
+# without performing schema initialization, and prediction uploads go to the
+# temp directory. The fixture below creates the disposable schema explicitly.
 import app.main  # noqa: F401
 
 # Patch every route module that cached SessionLocal at import time
@@ -54,6 +71,9 @@ for _mod_name in (
     "app.routes.users",
     "app.routes.feedback",
     "app.routes.language",
+    "app.routes.field_cases",
+    "app.routes.expert_reviews",
+    "app.routes.uploads",
 ):
     try:
         _mod = __import__(_mod_name, fromlist=["SessionLocal"])

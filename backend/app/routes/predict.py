@@ -1,12 +1,16 @@
+import hashlib
+import io
+import json
 import os
 import uuid
-import io
+from datetime import datetime, timezone
 from PIL import Image
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database.database import SessionLocal
 from app.models.prediction import Prediction
+from app.ai import real_predictor
 from app.utils.dependencies import get_current_user
 from app.ai.real_predictor import predict_disease
 
@@ -73,6 +77,16 @@ async def predict(
     os.makedirs(UPLOAD_DIR, exist_ok=True)
     unique_name = f"{uuid.uuid4()}.{ext}"
     file_path = os.path.join(UPLOAD_DIR, unique_name)
+    inference_timestamp = datetime.now(timezone.utc)
+    image_sha256 = hashlib.sha256(contents).hexdigest()
+    image_processing_history = json.dumps(
+        {
+            "schema_version": 1,
+            "operations": [],
+            "original_bytes_preserved": True,
+        },
+        separators=(",", ":"),
+    )
 
     try:
         with open(file_path, "wb") as f:
@@ -81,9 +95,13 @@ async def predict(
         prediction = Prediction(
             user_id=current_user["user_id"],
             image_url=file_path,
+            image_sha256=image_sha256,
+            image_processing_history=image_processing_history,
             disease=result["name"],
             confidence=result["confidence"],
             recommendation=result["recommendation"],
+            model_version=getattr(real_predictor, "MODEL_VERSION", None),
+            inference_timestamp=inference_timestamp,
         )
         db.add(prediction)
         db.commit()
@@ -135,7 +153,12 @@ async def get_prediction_history(
             "disease": p.disease,
             "confidence": p.confidence,
             "recommendation": p.recommendation,
-            "image_path": p.image_url,
+            # Preserve the response field while avoiding filesystem paths.
+            "image_path": (
+                f"/uploads/predictions/{os.path.basename(p.image_url)}"
+                if p.image_url
+                else None
+            ),
             "created_at": p.created_at.isoformat() if p.created_at else None
         }
         for p in predictions
@@ -151,9 +174,23 @@ async def get_prediction_stats(
     db: Session = Depends(get_db)
 ):
     total = db.query(Prediction).filter(Prediction.user_id == current_user["user_id"]).count()
+
+    # Ethiopian day (EAT = UTC+3, no DST). Compute the UTC range covering
+    # Ethiopian "today" (start-of-day to start-of-next-day in EAT), then
+    # compare against the stored UTC timestamps. Works on SQLite and PostgreSQL;
+    # uses index-friendly range comparison (no func.date, no dialect functions).
+    from datetime import datetime, timezone, timedelta
+    EAT = timezone(timedelta(hours=3))
+    now_eat = datetime.now(EAT)
+    start_eat = now_eat.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_eat = start_eat + timedelta(days=1)
+    start_utc = start_eat.astimezone(timezone.utc)
+    end_utc = end_eat.astimezone(timezone.utc)
+
     today = db.query(Prediction).filter(
         Prediction.user_id == current_user["user_id"],
-        func.date(Prediction.created_at) == func.date("now")
+        Prediction.created_at >= start_utc,
+        Prediction.created_at < end_utc,
     ).count()
     
     return {

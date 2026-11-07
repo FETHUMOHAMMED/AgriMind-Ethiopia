@@ -15,6 +15,9 @@ MODEL_AVAILABLE = False
 model = None
 CLASS_NAMES = []
 IMG_SIZE = 128
+# Checkpoints without explicit metadata remain ``None``. Eligibility code
+# must not infer a version from a filename or make an unverifiable claim.
+MODEL_VERSION = None
 
 MODEL_PATH = os.path.join(os.path.dirname(__file__), "model", "agrimind_mobilenetv2.pth")
 
@@ -23,6 +26,7 @@ try:
         checkpoint = torch.load(MODEL_PATH, map_location="cpu", weights_only=False)
         CLASS_NAMES = checkpoint["classes"]
         IMG_SIZE = checkpoint.get("img_size", 128)
+        MODEL_VERSION = checkpoint.get("model_version") or checkpoint.get("version")
 
         model = models.mobilenet_v2(weights=None)
         model.classifier[1] = nn.Linear(model.last_channel, len(CLASS_NAMES))
