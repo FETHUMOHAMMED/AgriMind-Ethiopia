@@ -1,0 +1,1281 @@
+"""PostgreSQL migration target verification and schema inspection (read-only).
+
+Parallel to schema_preflight.py (SQLite-only, preserved unchanged).
+New file — does not modify any existing code.
+
+Scope:
+    Step 3.1 (approved): PgTargetIdentity dataclass + guard_postgres_target()
+    Step 3.2 (approved): preflight_postgres() — catalog-based inspection
+    Step 3.2.1 (this revision): revision-specific schema validation via
+        REVISION_BASELINES_PG + _compare_against_revision()
+
+Design notes:
+- Host is logged for audit but NOT strictly compared. In containers, managed
+  databases, and behind proxies, inet_server_addr() differs from the DNS name
+  in the connection URL. Strict host comparison would reject every legitimate
+  deployment. MITM is prevented by TLS, not by hostname comparison.
+- Strictly compared: current_database(), current_user, current_schema(),
+  rolsuper=false.
+- Schema identity is verified explicitly. current_schema() reflects the
+  connection's effective search_path. Two connections to the same database as
+  the same user can inspect different schemas if their search paths differ.
+  PgTargetIdentity.schema declares the intended schema; it is verified once
+  and then used as an explicit parameter in all subsequent queries (never
+  re-read from current_schema()).
+- Unix socket connections return NULL for inet_server_addr() — handled
+  explicitly.
+
+PRODUCTION TLS REQUIREMENT (Phase 3 acceptance criterion):
+    Production callers MUST supply a PostgreSQL URL configured with
+    ``sslmode=verify-full``. This enables both certificate validation AND
+    hostname verification, preventing MITM attacks.
+
+    ``sslmode=require`` alone only encrypts the connection but does NOT
+    verify the server's hostname — a MITM with any valid certificate would
+    pass. This is explicitly documented here to prevent accidental use of
+    weaker TLS settings in production.
+
+    Enforcement at integration time: Step 3.3 (env.py wiring) will read the
+    URL and refuse to proceed unless ``sslmode`` is at least ``verify-full``
+    when the target is not localhost.
+
+INTEGRITY CHECK LIMITATION:
+    PostgreSQL catalog queries do NOT constitute a physical integrity check
+    equivalent to SQLite's ``PRAGMA integrity_check``. This module returns
+    ``None`` for ``integrity_check_ok`` and ``foreign_key_violation_count``
+    with an explicit ``integrity_check_status`` field documenting "not
+    performed". Callers must treat ``None`` as "not measured", not as failure
+    or success. Physical integrity verification, if required, must be a
+    separate operator-driven step (e.g., ``pg_dump | pg_restore`` round-trip).
+
+UNVALIDATED CONSTRAINT HANDLING:
+    PostgreSQL allows constraints with ``convalidated = false`` (added via
+    ``NOT VALID``). Such constraints may exist while pre-existing rows still
+    violate them. Detected separately and reported; status forced to
+    "unvalidated_constraints_present".
+
+CROSS-SCHEMA FOREIGN KEY HANDLING:
+    Foreign keys referencing tables in other schemas represent a policy
+    violation for a controlled migration target. Detected separately and
+    reported; status forced to "cross_schema_fk_present" — supersedes every
+    other status.
+
+INVALID INDEX HANDLING:
+    PostgreSQL indexes have two relevant flags:
+      - ``pg_index.indisvalid``: false → index cannot be used for query
+        planning (partially built, failed CONCURRENTLY, corrupted).
+      - ``pg_index.indisready``: false → index mid-build, not yet accepting
+        writes.
+    An index that exists in the catalog but is invalid or not-ready cannot
+    serve its intended queries. Scope-tight: only application tables in
+    LEGACY_BASELINE_PG are checked, so unrelated transient or scratch tables
+    cannot block migration preflight. Status forced to
+    "invalid_indexes_present" when any exist on application tables.
+
+ID GENERATION STRATEGY:
+    Six mutually exclusive classifications preserve the distinction between
+    SERIAL, orphaned sequences, plain INTEGER, and GENERATED IDENTITY:
+
+      - "plain":                   no auto-generation, no sequence involvement
+      - "serial":                  column owns a sequence AND active default
+                                   is nextval(...) AND depends on exactly one
+                                   distinct sequence whose OID matches the
+                                   owned sequence OID
+      - "orphaned_sequence":       column owns a sequence but the pattern does
+                                   not match SERIAL (default missing, not
+                                   nextval, or depends on a different /
+                                   multiple sequence(s)) — drift
+      - "manual_sequence_default": default depends on one or more sequences
+                                   but the column owns no sequence — drift
+      - "identity_always":         GENERATED ALWAYS AS IDENTITY
+      - "identity_by_default":     GENERATED BY DEFAULT AS IDENTITY
+
+    Verification uses OID comparison, not name substring matching:
+      - Owned sequence OID: ``to_regclass(pg_get_serial_sequence(...))::oid``
+      - Default sequence count: ``COUNT(DISTINCT d.refobjid)`` over
+        pg_attrdef → pg_depend (refclassid='pg_class'::regclass, deptype='n',
+        referenced pg_class.relkind='S')
+      - Default sequence OID: non-NULL only when exactly one distinct
+        sequence is referenced
+      - SERIAL requires nextval( prefix AND count == 1 AND matching OIDs.
+        Multiple sequence dependencies cannot be misclassified as SERIAL.
+
+    pg_get_serial_sequence() returns the associated sequence for GENERATED
+    IDENTITY columns too. ``is_identity='YES'`` is checked first and
+    correctly classifies those before the serial branch runs.
+
+REVISION-SPECIFIC VALIDATION (Step 3.2.1):
+    The alembic_version table records migration history, not schema state.
+    A database stamped at revision X may have been manually corrupted since
+    that revision applied. preflight_postgres() therefore validates the
+    actual schema against REVISION_BASELINES_PG[recorded_revision] when a
+    single known revision is recorded, producing:
+      - ``matches_current_revision_baseline``: bool | None
+      - ``current_revision_schema_status``: "matches" | "mismatched" |
+        "no_revision" | "unknown_revision"
+
+    ``matches_current_revision_baseline=True`` does NOT by itself authorize
+    migration. Independent safety checks (cross-schema FKs, invalid indexes,
+    unvalidated constraints) must ALSO be clean. env.py gates on both.
+"""
+
+from __future__ import annotations
+
+import copy
+import sys
+from dataclasses import dataclass
+from typing import Any
+
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Connection, URL
+from sqlalchemy.pool import NullPool
+
+from app.database.schema_preflight import SchemaTargetError
+
+
+_SYSTEM_DATABASES = frozenset({"postgres", "template0", "template1"})
+_ALEMBIC_VERSION_TABLE = "alembic_version"
+_LEGACY_BASELINE_REVISION = "000000000001"
+
+
+# PostgreSQL baseline — same logical schema as schema_preflight.LEGACY_BASELINE
+# but with PostgreSQL type vocabulary:
+#   INTEGER  -> integer
+#   VARCHAR  -> character varying
+#   FLOAT    -> double precision
+#   DATETIME -> timestamp with time zone  (ORM: DateTime(timezone=True))
+#   BOOLEAN  -> boolean
+#
+# VARCHAR LENGTH INVARIANT:
+#   All legacy VARCHAR columns are Column(String) without a length argument.
+#   PostgreSQL reports character_maximum_length = NULL for these -> bare
+#   'character varying' in _get_columns(), matching this baseline.
+#   Phase 4+ baseline additions with length-limited columns MUST include the
+#   length in their baseline entry, e.g. 'character varying(64)' for
+#   Column(String(64)). Length drift IS detected (character varying vs
+#   character varying(N) mismatch).
+#
+# ID GENERATION INVARIANT:
+#   Legacy PK columns (Integer(primary_key=True)) render as PostgreSQL SERIAL:
+#   column owns a sequence, active default is nextval(...), sequence OID
+#   matches owned OID, is_identity='NO'. Baseline captures this as
+#   "id_generation": "serial".
+#   All 18 non-PK columns have no auto-generation:
+#   "id_generation": "plain". Total: 21 columns (3 PK + 18 non-PK).
+#   Drift to GENERATED IDENTITY, to a plain INTEGER PK, or to any
+#   orphaned/manual-sequence pattern is detected via id_generation mismatch.
+#
+# Primary-key indexes (*_pkey) are excluded because SQLite's rowid PK does not
+# create a separate index entry.
+LEGACY_BASELINE_PG: dict[str, Any] = {
+    "users": {
+        "columns": {
+            "id": {
+                "type": "integer", "nullable": False, "primary_key": True,
+                "default": None, "id_generation": "serial",
+            },
+            "full_name": {
+                "type": "character varying", "nullable": False, "primary_key": False,
+                "default": None, "id_generation": "plain",
+            },
+            "email": {
+                "type": "character varying", "nullable": False, "primary_key": False,
+                "default": None, "id_generation": "plain",
+            },
+            "phone": {
+                "type": "character varying", "nullable": True, "primary_key": False,
+                "default": None, "id_generation": "plain",
+            },
+            "password_hash": {
+                "type": "character varying", "nullable": False, "primary_key": False,
+                "default": None, "id_generation": "plain",
+            },
+            "language": {
+                "type": "character varying", "nullable": True, "primary_key": False,
+                "default": None, "id_generation": "plain",
+            },
+            "role": {
+                "type": "character varying", "nullable": True, "primary_key": False,
+                "default": None, "id_generation": "plain",
+            },
+            "created_at": {
+                "type": "timestamp with time zone", "nullable": True, "primary_key": False,
+                "default": "CURRENT_TIMESTAMP", "id_generation": "plain",
+            },
+        },
+        "indexes": {
+            "ix_users_email": {"unique": True, "columns": ("email",)},
+            "ix_users_id": {"unique": False, "columns": ("id",)},
+        },
+        "foreign_keys": set(),
+        "checks": (),
+    },
+    "predictions": {
+        "columns": {
+            "id": {
+                "type": "integer", "nullable": False, "primary_key": True,
+                "default": None, "id_generation": "serial",
+            },
+            "user_id": {
+                "type": "integer", "nullable": False, "primary_key": False,
+                "default": None, "id_generation": "plain",
+            },
+            "image_url": {
+                "type": "character varying", "nullable": True, "primary_key": False,
+                "default": None, "id_generation": "plain",
+            },
+            "disease": {
+                "type": "character varying", "nullable": False, "primary_key": False,
+                "default": None, "id_generation": "plain",
+            },
+            "confidence": {
+                "type": "double precision", "nullable": True, "primary_key": False,
+                "default": None, "id_generation": "plain",
+            },
+            "recommendation": {
+                "type": "character varying", "nullable": True, "primary_key": False,
+                "default": None, "id_generation": "plain",
+            },
+            "created_at": {
+                "type": "timestamp with time zone", "nullable": True, "primary_key": False,
+                "default": "CURRENT_TIMESTAMP", "id_generation": "plain",
+            },
+        },
+        "indexes": {
+            "ix_predictions_id": {"unique": False, "columns": ("id",)},
+        },
+        "foreign_keys": {
+            ("user_id", "users", "id"),
+        },
+        "checks": (),
+    },
+    "feedbacks": {
+        "columns": {
+            "id": {
+                "type": "integer", "nullable": False, "primary_key": True,
+                "default": None, "id_generation": "serial",
+            },
+            "user_id": {
+                "type": "integer", "nullable": False, "primary_key": False,
+                "default": None, "id_generation": "plain",
+            },
+            "prediction_id": {
+                "type": "integer", "nullable": False, "primary_key": False,
+                "default": None, "id_generation": "plain",
+            },
+            "correct": {
+                "type": "boolean", "nullable": False, "primary_key": False,
+                "default": None, "id_generation": "plain",
+            },
+            "comment": {
+                "type": "character varying", "nullable": True, "primary_key": False,
+                "default": None, "id_generation": "plain",
+            },
+            "created_at": {
+                "type": "timestamp with time zone", "nullable": True, "primary_key": False,
+                "default": "CURRENT_TIMESTAMP", "id_generation": "plain",
+            },
+        },
+        "indexes": {
+            "ix_feedbacks_id": {"unique": False, "columns": ("id",)},
+        },
+        "foreign_keys": {
+            ("user_id", "users", "id"),
+            ("prediction_id", "predictions", "id"),
+        },
+        "checks": (),
+    },
+}
+
+
+# Revision-specific PostgreSQL schema baselines (Step 3.2.1).
+#
+# Each entry corresponds to the schema expected immediately after the named
+# Alembic revision has been applied. preflight_postgres() validates the
+# actual schema against this baseline when a single known revision is
+# recorded in the alembic_version table — closing the gap where the version
+# table alone cannot detect schema corruption after a successful migration.
+#
+# Adding a new revision (Phase 4 adds 000000000003-000000000006) requires a
+# corresponding entry here. Without it, unknown_revision is returned and the
+# migration gate refuses — discovery via ScriptDirectory.walk_revisions()
+# does NOT automatically authorize migration against a new revision; the
+# schema must also be explicitly validated.
+#
+# VARCHAR lengths preserved: image_sha256 is character varying(64) because
+# the ORM declares String(length=64) — a bare 'character varying' would
+# silently accept a lengthless column as valid.
+#
+# DEEP COPY: _REVISION_0002_BASELINE is constructed as a deep copy of
+# LEGACY_BASELINE_PG so that mutations to one cannot affect the other. The
+# two baselines share only the users and feedbacks table specs (unchanged by
+# revision 000000000002) via reference; predictions is fully independent.
+_REVISION_0002_BASELINE: dict[str, Any] = copy.deepcopy(LEGACY_BASELINE_PG)
+_REVISION_0002_BASELINE["predictions"]["columns"].update({
+    "image_sha256": {
+        "type": "character varying(64)",
+        "nullable": True,
+        "primary_key": False,
+        "default": None,
+        "id_generation": "plain",
+    },
+    "image_processing_history": {
+        "type": "character varying(2000)",
+        "nullable": True,
+        "primary_key": False,
+        "default": None,
+        "id_generation": "plain",
+    },
+    "model_version": {
+        "type": "character varying(100)",
+        "nullable": True,
+        "primary_key": False,
+        "default": None,
+        "id_generation": "plain",
+    },
+    "inference_timestamp": {
+        "type": "timestamp with time zone",
+        "nullable": True,
+        "primary_key": False,
+        "default": None,
+        "id_generation": "plain",
+    },
+})
+_REVISION_0002_BASELINE["predictions"]["indexes"]["ix_predictions_image_sha256"] = {
+    "unique": False,
+    "columns": ("image_sha256",),
+}
+
+REVISION_BASELINES_PG: dict[str, dict[str, Any]] = {
+    "000000000001": LEGACY_BASELINE_PG,
+    "000000000002": _REVISION_0002_BASELINE,
+}
+
+
+@dataclass(frozen=True)
+class PgTargetIdentity:
+    """Explicit authorization for a PostgreSQL migration target.
+
+    Fields:
+        database: Expected value of current_database().
+        user:     Expected value of current_user (must not be a superuser).
+        schema:   Expected value of current_schema() — i.e., the first valid
+                  schema on the connection's search_path. Verified once per
+                  connection; used as an explicit parameter in all inspection
+                  queries.
+
+    Host is intentionally excluded — see module docstring.
+    """
+    database: str
+    user: str
+    schema: str = "public"
+
+
+# ============================================================================
+# Internal helpers — pre-connection checks and per-connection identity verify
+# ============================================================================
+
+
+def _pre_connection_checks(url: URL, expected: PgTargetIdentity) -> None:
+    """Fail-fast checks that don't require a network connection."""
+    backend = url.get_backend_name()
+    if backend != "postgresql":
+        raise SchemaTargetError(
+            f"Refusing migration target: not a PostgreSQL URL "
+            f"(dialect={backend!r}, expected 'postgresql')"
+        )
+    if url.database in _SYSTEM_DATABASES or not url.database:
+        raise SchemaTargetError(
+            f"Refusing migration target: system or missing database {url.database!r}"
+        )
+    if url.database != expected.database:
+        raise SchemaTargetError(
+            f"Refusing migration target: URL database {url.database!r} "
+            f"does not match expected {expected.database!r}"
+        )
+    if not expected.schema or not isinstance(expected.schema, str):
+        raise SchemaTargetError(
+            f"Refusing migration target: expected.schema must be a non-empty string, "
+            f"got {expected.schema!r}"
+        )
+
+
+def _verify_identity_on_conn(
+    conn: Connection, url: URL, expected: PgTargetIdentity
+) -> str:
+    """Verify live connection identity. Assumes READ ONLY transaction already set.
+
+    Returns the verified schema name (== expected.schema). Raises on mismatch.
+
+    Called from both guard_postgres_target() and preflight_postgres() so the
+    identity check runs on the SAME connection that will be used for schema
+    inspection. This closes a target-switching TOCTOU window.
+    """
+    actual = conn.execute(text(
+        "SELECT current_database() AS db, "
+        "       current_user AS usr, "
+        "       current_schema() AS schema_name, "
+        "       inet_server_addr()::text AS server_ip, "
+        "       inet_server_port() AS port, "
+        "       (SELECT rolsuper FROM pg_roles WHERE rolname = current_user) AS is_super"
+    )).mappings().one()
+
+    mismatches = []
+    if actual["db"] != expected.database:
+        mismatches.append(
+            f"database: actual={actual['db']!r} expected={expected.database!r}"
+        )
+    if actual["usr"] != expected.user:
+        mismatches.append(
+            f"user: actual={actual['usr']!r} expected={expected.user!r}"
+        )
+    if actual["schema_name"] is None:
+        mismatches.append(
+            "schema: current_schema() returned NULL — connection's search_path "
+            "contains no valid schema; cannot determine target schema"
+        )
+    elif actual["schema_name"] != expected.schema:
+        mismatches.append(
+            f"schema: actual={actual['schema_name']!r} expected={expected.schema!r} "
+            f"(connection's effective search_path points to a different schema)"
+        )
+    if actual["is_super"]:
+        mismatches.append(
+            f"user {actual['usr']} is a superuser — refusing (use a dedicated migrator role)"
+        )
+
+    if mismatches:
+        raise SchemaTargetError(
+            "Connection identity mismatch — refusing to migrate:\n  "
+            + "\n  ".join(mismatches)
+        )
+
+    server_ip = actual["server_ip"] if actual["server_ip"] is not None else "<unix_socket>"
+    print(
+        f"[pg-preflight] database={actual['db']} user={actual['usr']} "
+        f"schema={actual['schema_name']} server_ip={server_ip} port={actual['port']} "
+        f"configured_host={url.host!r}",
+        file=sys.stderr,
+    )
+
+    return str(actual["schema_name"])
+
+
+# ============================================================================
+# Public API — Step 3.1: standalone guard
+# ============================================================================
+
+
+def guard_postgres_target(url: URL, *, expected: PgTargetIdentity) -> None:
+    """Refuse unless the live PostgreSQL connection matches expected identity.
+
+    Pre-connection refusals (no network call):
+      1. Non-PostgreSQL URL dialect
+      2. System databases (postgres, template0, template1) or missing name
+      3. URL database name mismatching expected.database
+      4. Missing or empty expected.schema
+
+    Strictly verified against live PostgreSQL (single connection):
+      - current_database() == expected.database
+      - current_user     == expected.user
+      - current_schema() == expected.schema  (NULL -> refused)
+      - current_user is NOT a superuser
+
+    Logged but not compared:
+      - inet_server_addr(), inet_server_port() — server-side view, not URL host.
+
+    Production TLS: callers MUST use ``sslmode=verify-full``. Enforcement at
+    Step 3.3.
+
+    Raises SchemaTargetError if any check fails.
+    """
+    _pre_connection_checks(url, expected)
+
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            conn.exec_driver_sql("SET TRANSACTION READ ONLY")
+            _verify_identity_on_conn(conn, url, expected)
+    finally:
+        engine.dispose()
+
+
+# ============================================================================
+# Public API — Step 3.2 / 3.2.1: schema inspection
+# ============================================================================
+
+
+def preflight_postgres(url: URL, *, expected: PgTargetIdentity) -> dict[str, Any]:
+    """Read-only schema inspection for a PostgreSQL migration target.
+
+    Opens ONE connection, sets it read-only, verifies identity (including
+    schema), inspects the schema, detects unvalidated constraints, detects
+    cross-schema foreign keys, detects invalid indexes, and — when a single
+    known revision is recorded — validates the actual schema against the
+    baseline expected for that revision. All on the same connection.
+
+    Returns a dict mirroring schema_preflight.preflight_database(path), with:
+
+      - ``schema``: the verified schema name
+      - ``alembic_revisions``: list of recorded revision strings
+      - ``matches_current_revision_baseline``: bool | None — True iff the
+        recorded revision's expected schema matches; None if no revision or
+        an unknown revision is recorded
+      - ``current_revision_schema_status``: "matches" | "mismatched" |
+        "no_revision" | "unknown_revision"
+      - ``unvalidated_constraints``: list of {table, constraint, kind}
+      - ``cross_schema_fks``: list of {source_table, source_column,
+        referenced_schema, referenced_table, referenced_column}
+      - ``invalid_indexes``: list of {table, index, is_valid, is_ready}
+      - ``integrity_check_ok``: None (not performed — see module docstring)
+      - ``foreign_key_violation_count``: None (not performed)
+      - ``integrity_check_status``: "not_performed_pg"
+      - ``integrity_check_note``: reason string
+      - plus baseline comparison fields (matches_known_baseline,
+        missing_tables, unexpected_tables, missing_columns,
+        unexpected_columns, column_mismatches, missing_indexes,
+        unexpected_indexes, index_mismatches, foreign_key_mismatches,
+        check_constraint_mismatches)
+
+    Status values (highest priority first):
+        - "cross_schema_fk_present"
+        - "invalid_indexes_present"
+        - "unvalidated_constraints_present"
+        - "recognized_empty_database": the target schema contains no base
+          tables at all — not even an empty alembic_version table. This is
+          the ONLY status eligible for fresh-install migrations under
+          explicit `-x allow_fresh=true`. A schema that contains
+          alembic_version (even empty) is NOT recognized as empty and
+          falls through to "unknown_or_partial_schema".
+        - "recognized_revision": the actual schema matches the baseline
+          expected for the recorded revision. Correct for both a clean
+          revision-0001 database AND a clean revision-0002 database (which
+          includes provenance columns and index not present in the legacy
+          baseline).
+        - "revision_drift": at a known revision but schema does not match
+          expected baseline for that revision.
+        - "recognized_unversioned_legacy_baseline": no revision recorded,
+          schema matches legacy baseline.
+        - "unknown_or_partial_schema": everything else.
+
+    IMPORTANT — legacy comparison vs revision comparison:
+        ``matches_known_baseline`` (in the return dict) reflects comparison
+        against ``LEGACY_BASELINE_PG`` only. A valid revision-0002 database
+        will have ``matches_known_baseline = False`` because its provenance
+        columns are absent from the legacy baseline. This is EXPECTED.
+
+        ``matches_current_revision_baseline`` reflects comparison against
+        ``REVISION_BASELINES_PG[recorded_revision]``. For a clean
+        revision-0002 database, this is ``True``.
+
+        Callers must gate on ``status == "recognized_revision"`` (which
+        incorporates both safety checks AND revision-specific validation),
+        NOT on ``matches_known_baseline``.
+
+    Callers must treat None as "not measured", not as failure or success.
+    """
+    _pre_connection_checks(url, expected)
+
+    engine = create_engine(url, poolclass=NullPool)
+    try:
+        with engine.connect() as conn:
+            conn.exec_driver_sql("SET TRANSACTION READ ONLY")
+            verified_schema = _verify_identity_on_conn(conn, url, expected)
+
+            table_names = _list_tables(conn, verified_schema)
+            inspected: dict[str, dict[str, Any]] = {}
+            for table in sorted(table_names):
+                if table == _ALEMBIC_VERSION_TABLE:
+                    continue
+                inspected[table] = _inspect_table(conn, verified_schema, table)
+
+            revisions = _read_revisions(conn, verified_schema)
+            unvalidated = _find_unvalidated_constraints(conn, verified_schema)
+            cross_schema_fks = _find_cross_schema_fks(conn, verified_schema)
+            invalid_indexes = _find_invalid_indexes(conn, verified_schema)
+    finally:
+        engine.dispose()
+
+    comparison = _compare_baseline_pg(inspected, set(table_names), revisions)
+
+    # Revision-specific validation (Step 3.2.1).
+    #
+    # Independent from comparison["matches_known_baseline"], which validates
+    # against the legacy baseline (000000000001) regardless of recorded
+    # revision. This block answers a different question: "does the actual
+    # schema match the schema the RECORDED revision is expected to produce?"
+    #
+    # Unknown revisions return structured "unknown_revision" status rather
+    # than raising, so preflight remains a pure read-only reporting operation.
+    if len(revisions) == 1 and revisions[0] in REVISION_BASELINES_PG:
+        rev_comparison = _compare_against_revision(
+            revisions[0], inspected, set(table_names)
+        )
+        matches_current_revision = rev_comparison["matches_known_baseline"]
+        current_revision_status = (
+            "matches" if matches_current_revision else "mismatched"
+        )
+    elif not revisions:
+        matches_current_revision = None
+        current_revision_status = "no_revision"
+    else:
+        matches_current_revision = None
+        current_revision_status = "unknown_revision"
+
+    # Status derivation (Step 3.2.2).
+    # Pure logic extracted into _compute_is_fully_empty and _derive_status
+    # so that all seven acceptance criteria are testable without a live
+    # PostgreSQL connection.
+    is_fully_empty = _compute_is_fully_empty(
+        current_revision_status=current_revision_status,
+        revisions=revisions,
+        inspected=inspected,
+        table_names=table_names,
+    )
+    status = _derive_status(
+        cross_schema_fks=cross_schema_fks,
+        invalid_indexes=invalid_indexes,
+        unvalidated=unvalidated,
+        is_fully_empty=is_fully_empty,
+        current_revision_status=current_revision_status,
+        matches_known_baseline=comparison["matches_known_baseline"],
+    )
+
+    return {
+        "database": f"{url.host}:{url.port}/{url.database}",
+        "schema": verified_schema,
+        "status": status,
+        "alembic_revisions": revisions,
+        "matches_current_revision_baseline": matches_current_revision,
+        "current_revision_schema_status": current_revision_status,
+        "unvalidated_constraints": unvalidated,
+        "cross_schema_fks": cross_schema_fks,
+        "invalid_indexes": invalid_indexes,
+        "integrity_check_ok": None,
+        "foreign_key_violation_count": None,
+        "integrity_check_status": "not_performed_pg",
+        "integrity_check_note": (
+            "PostgreSQL catalog queries do not constitute a physical integrity "
+            "check equivalent to SQLite's PRAGMA integrity_check or PRAGMA "
+            "foreign_key_check. Values are None (not measured), not True/0. "
+            "Physical verification, if required, must be a separate "
+            "operator-driven step (e.g., pg_dump | pg_restore round-trip)."
+        ),
+        **comparison,
+    }
+
+def _compute_is_fully_empty(
+    current_revision_status: str,
+    revisions: list[str],
+    inspected: dict[str, dict[str, Any]],
+    table_names: set[str],
+) -> bool:
+    """True iff the PostgreSQL target schema is genuinely empty.
+
+    All four conditions must hold:
+      1. No Alembic revision recorded
+      2. No revision rows returned
+      3. No application tables inspected (inspected excludes
+         alembic_version by construction)
+      4. No base tables at all in the schema
+
+    Condition 4 (``not table_names``) is the critical discriminator: it
+    refuses a schema that contains ONLY an alembic_version table (even with
+    zero rows). Such a schema is not a fresh database — it is a database
+    where someone has already touched Alembic. Recognition as
+    recognized_empty_database would be unsafe there because the operator's
+    intent is ambiguous: did a prior migration partially succeed, or was
+    alembic_version created manually?
+
+    A schema that exists but cannot be fully inspected (e.g., catalog
+    visibility failure) MUST raise — not return this function's result.
+    Callers must not treat inspection exceptions as "empty".
+    """
+    return (
+        current_revision_status == "no_revision"
+        and not revisions
+        and not inspected
+        and not table_names
+    )
+
+
+def _derive_status(
+    *,
+    cross_schema_fks: list[dict[str, str]],
+    invalid_indexes: list[dict[str, Any]],
+    unvalidated: list[dict[str, str]],
+    is_fully_empty: bool,
+    current_revision_status: str,
+    matches_known_baseline: bool,
+) -> str:
+    """Pure function — derive overall preflight status from collected signals.
+
+    Priority (highest first):
+      1. cross_schema_fk_present      — safety check, cannot be overridden
+      2. invalid_indexes_present      — safety check, cannot be overridden
+      3. unvalidated_constraints_present — safety check, cannot be overridden
+      4. recognized_empty_database    — genuinely empty schema
+      5. recognized_revision          — schema matches recorded revision's baseline
+      6. revision_drift               — at known revision but schema drifted
+      7. recognized_unversioned_legacy_baseline — no revision, matches legacy
+      8. unknown_or_partial_schema    — everything else
+
+    Safety checks (#1–#3) fire first regardless of empty/revision state —
+    they cannot be masked by is_fully_empty or a matching revision.
+    """
+    if cross_schema_fks:
+        return "cross_schema_fk_present"
+    if invalid_indexes:
+        return "invalid_indexes_present"
+    if unvalidated:
+        return "unvalidated_constraints_present"
+    if is_fully_empty:
+        return "recognized_empty_database"
+    if current_revision_status == "matches":
+        return "recognized_revision"
+    if current_revision_status == "mismatched":
+        return "revision_drift"
+    if current_revision_status == "no_revision":
+        if matches_known_baseline:
+            return "recognized_unversioned_legacy_baseline"
+        return "unknown_or_partial_schema"
+    # unknown_revision or anything unexpected
+    return "unknown_or_partial_schema"
+
+# ============================================================================
+# Catalog inspection helpers — all queries parameterized by schema
+# ============================================================================
+
+
+def _list_tables(conn: Connection, schema: str) -> set[str]:
+    rows = conn.execute(text(
+        "SELECT table_name FROM information_schema.tables "
+        "WHERE table_schema = :schema AND table_type = 'BASE TABLE'"
+    ), {"schema": schema}).fetchall()
+    return {str(row[0]) for row in rows}
+
+
+def _inspect_table(conn: Connection, schema: str, table: str) -> dict[str, Any]:
+    return {
+        "columns": _get_columns(conn, schema, table),
+        "indexes": _get_indexes(conn, schema, table),
+        "foreign_keys": _get_foreign_keys(conn, schema, table),
+        "checks": _get_checks(conn, schema, table),
+    }
+
+
+def _get_columns(conn: Connection, schema: str, table: str) -> dict[str, dict[str, Any]]:
+    """Inspect columns. Six ID-generation classifications via OID comparison
+    (not name substring matching) so SERIAL, orphaned sequences, plain
+    INTEGER, and GENERATED IDENTITY cannot be conflated.
+
+    See module docstring ID GENERATION STRATEGY section for classification
+    semantics and OID verification method.
+
+    VARCHAR lengths preserved (see LEGACY_BASELINE_PG VARCHAR LENGTH
+    INVARIANT).
+
+    pg_get_serial_sequence() returns the associated sequence for GENERATED
+    IDENTITY columns too. is_identity='YES' is checked first and correctly
+    classifies those before the serial branch runs.
+    """
+    rows = conn.execute(text("""
+        SELECT
+            i.column_name,
+            i.data_type,
+            i.is_nullable,
+            i.column_default,
+            i.character_maximum_length,
+            i.is_identity,
+            i.identity_generation,
+            pg_get_serial_sequence(
+                format('%I.%I', :schema, :table), i.column_name
+            ) AS owned_sequence_name,
+            to_regclass(
+                pg_get_serial_sequence(
+                    format('%I.%I', :schema, :table), i.column_name
+                )
+            )::oid AS owned_sequence_oid,
+            COALESCE((
+                SELECT COUNT(DISTINCT d.refobjid)
+                FROM pg_attribute a
+                JOIN pg_attrdef ad
+                  ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum
+                JOIN pg_depend d
+                  ON d.classid = 'pg_attrdef'::regclass AND d.objid = ad.oid
+                JOIN pg_class sc ON d.refobjid = sc.oid
+                WHERE a.attrelid = format('%I.%I', :schema, :table)::regclass
+                  AND a.attname = i.column_name
+                  AND d.refclassid = 'pg_class'::regclass
+                  AND d.deptype = 'n'
+                  AND sc.relkind = 'S'
+            ), 0) AS default_sequence_count,
+            (
+                SELECT CASE
+                    WHEN COUNT(DISTINCT d.refobjid) = 1
+                    THEN MAX(d.refobjid::bigint)
+                    ELSE NULL
+                END
+                FROM pg_attribute a
+                JOIN pg_attrdef ad
+                  ON ad.adrelid = a.attrelid AND ad.adnum = a.attnum
+                JOIN pg_depend d
+                  ON d.classid = 'pg_attrdef'::regclass AND d.objid = ad.oid
+                JOIN pg_class sc ON d.refobjid = sc.oid
+                WHERE a.attrelid = format('%I.%I', :schema, :table)::regclass
+                  AND a.attname = i.column_name
+                  AND d.refclassid = 'pg_class'::regclass
+                  AND d.deptype = 'n'
+                  AND sc.relkind = 'S'
+            ) AS default_sequence_oid
+        FROM information_schema.columns i
+        WHERE i.table_name = :table
+          AND i.table_schema = :schema
+        ORDER BY i.ordinal_position
+    """), {"table": table, "schema": schema}).mappings().all()
+
+    pk_columns = _get_primary_key_columns(conn, schema, table)
+
+    result: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        base_type = str(row["data_type"])
+        length = row["character_maximum_length"]
+        if length is not None:
+            base_type = f"{base_type}({length})"
+
+        owned_seq_oid = row["owned_sequence_oid"]
+        default_seq_count = int(row["default_sequence_count"])
+        default_seq_oid = row["default_sequence_oid"]
+
+        default_expr_lower = str(row["column_default"] or "").strip().lower()
+        uses_nextval = default_expr_lower.startswith("nextval(")
+
+        if row["is_identity"] == "YES":
+            id_generation = (
+                "identity_always"
+                if row["identity_generation"] == "ALWAYS"
+                else "identity_by_default"
+            )
+        elif owned_seq_oid is not None:
+            if (
+                uses_nextval
+                and default_seq_count == 1
+                and default_seq_oid is not None
+                and int(default_seq_oid) == int(owned_seq_oid)
+            ):
+                id_generation = "serial"
+            else:
+                id_generation = "orphaned_sequence"
+        elif default_seq_count > 0:
+            id_generation = "manual_sequence_default"
+        else:
+            id_generation = "plain"
+
+        result[row["column_name"]] = {
+            "type": _normalize_pg_type(base_type),
+            "nullable": row["is_nullable"] == "YES",
+            "primary_key": row["column_name"] in pk_columns,
+            "default": _normalize_pg_default(row["column_default"]),
+            "id_generation": id_generation,
+        }
+    return result
+
+
+def _get_primary_key_columns(conn: Connection, schema: str, table: str) -> set[str]:
+    """Primary-key columns for :table via pg_constraint.conrelid."""
+    rows = conn.execute(text("""
+        SELECT a.attname AS column_name
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        JOIN unnest(c.conkey) WITH ORDINALITY AS k(attnum, ord) ON true
+        JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+        WHERE t.relname = :table
+          AND n.nspname = :schema
+          AND c.contype = 'p'
+        ORDER BY k.ord
+    """), {"table": table, "schema": schema}).fetchall()
+    return {str(row[0]) for row in rows}
+
+
+def _get_indexes(conn: Connection, schema: str, table: str) -> dict[str, dict[str, Any]]:
+    """Non-PK indexes. PK indexes (*_pkey) excluded to match SQLite rowid PK."""
+    rows = conn.execute(text("""
+        SELECT i.relname AS index_name,
+               ix.indisunique AS is_unique,
+               array_agg(COALESCE(a.attname, '<expression>') ORDER BY k.ord) AS columns
+        FROM pg_index ix
+        JOIN pg_class i ON i.oid = ix.indexrelid
+        JOIN pg_class t ON t.oid = ix.indrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        JOIN unnest(ix.indkey) WITH ORDINALITY AS k(attnum, ord) ON true
+        LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = k.attnum
+        WHERE t.relname = :table
+          AND n.nspname = :schema
+          AND ix.indisprimary = false
+        GROUP BY i.relname, ix.indisunique
+    """), {"table": table, "schema": schema}).mappings().all()
+    return {
+        row["index_name"]: {
+            "unique": bool(row["is_unique"]),
+            "columns": tuple(row["columns"]),
+        }
+        for row in rows
+    }
+
+
+def _get_foreign_keys(
+    conn: Connection, schema: str, table: str
+) -> set[tuple[str, str, str]]:
+    """Same-schema foreign keys only, as (source_column, referenced_table,
+    referenced_column) tuples.
+
+    Joins BOTH source and referenced table namespaces via conrelid and
+    confrelid. Only FKs where both namespaces equal :schema are returned.
+    Cross-schema FKs are detected separately by _find_cross_schema_fks().
+
+    Composite FKs are matched in correct column order via multi-array unnest.
+    """
+    rows = conn.execute(text("""
+        SELECT
+            a_src.attname AS column_name,
+            t_ref.relname AS ref_table,
+            a_ref.attname AS ref_column
+        FROM pg_constraint c
+        JOIN pg_class t_src ON t_src.oid = c.conrelid
+        JOIN pg_namespace n_src ON n_src.oid = t_src.relnamespace
+        JOIN pg_class t_ref ON t_ref.oid = c.confrelid
+        JOIN pg_namespace n_ref ON n_ref.oid = t_ref.relnamespace
+        JOIN unnest(c.conkey, c.confkey) WITH ORDINALITY AS k(src_attnum, ref_attnum, ord)
+          ON true
+        JOIN pg_attribute a_src ON a_src.attrelid = t_src.oid AND a_src.attnum = k.src_attnum
+        JOIN pg_attribute a_ref ON a_ref.attrelid = t_ref.oid AND a_ref.attnum = k.ref_attnum
+        WHERE t_src.relname = :table
+          AND n_src.nspname = :schema
+          AND n_ref.nspname = :schema
+          AND c.contype = 'f'
+    """), {"table": table, "schema": schema}).fetchall()
+    return {(str(r[0]), str(r[1]), str(r[2])) for r in rows}
+
+
+def _get_checks(conn: Connection, schema: str, table: str) -> tuple[str, ...]:
+    """Check constraint definitions for :table via pg_constraint.conrelid."""
+    rows = conn.execute(text("""
+        SELECT pg_get_constraintdef(c.oid) AS check_def
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE t.relname = :table
+          AND n.nspname = :schema
+          AND c.contype = 'c'
+    """), {"table": table, "schema": schema}).fetchall()
+    return tuple(sorted(_normalize_pg_check(str(r[0])) for r in rows))
+
+
+def _find_unvalidated_constraints(
+    conn: Connection, schema: str
+) -> list[dict[str, str]]:
+    """Detect unvalidated FK and CHECK constraints in the given schema."""
+    rows = conn.execute(text("""
+        SELECT t.relname AS table_name,
+               c.conname AS constraint_name,
+               CASE c.contype WHEN 'f' THEN 'foreign_key' WHEN 'c' THEN 'check' END AS kind
+        FROM pg_constraint c
+        JOIN pg_class t ON t.oid = c.conrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE n.nspname = :schema
+          AND c.contype IN ('f', 'c')
+          AND c.convalidated = false
+        ORDER BY t.relname, c.conname
+    """), {"schema": schema}).mappings().all()
+    return [
+        {
+            "table": row["table_name"],
+            "constraint": row["constraint_name"],
+            "kind": row["kind"],
+        }
+        for row in rows
+    ]
+
+
+def _find_cross_schema_fks(
+    conn: Connection, schema: str
+) -> list[dict[str, str]]:
+    """Detect FKs whose source table is in :schema but whose referenced table
+    is in a DIFFERENT schema.
+
+    Joins BOTH source and referenced namespaces via conrelid and confrelid.
+    Composite FKs matched in correct column order via multi-array unnest.
+    """
+    rows = conn.execute(text("""
+        SELECT
+            t_src.relname AS source_table,
+            a_src.attname AS source_column,
+            n_ref.nspname AS referenced_schema,
+            t_ref.relname AS referenced_table,
+            a_ref.attname AS referenced_column
+        FROM pg_constraint c
+        JOIN pg_class t_src ON t_src.oid = c.conrelid
+        JOIN pg_namespace n_src ON n_src.oid = t_src.relnamespace
+        JOIN pg_class t_ref ON t_ref.oid = c.confrelid
+        JOIN pg_namespace n_ref ON n_ref.oid = t_ref.relnamespace
+        JOIN unnest(c.conkey, c.confkey) WITH ORDINALITY AS k(src_attnum, ref_attnum, ord)
+          ON true
+        JOIN pg_attribute a_src ON a_src.attrelid = t_src.oid AND a_src.attnum = k.src_attnum
+        JOIN pg_attribute a_ref ON a_ref.attrelid = t_ref.oid AND a_ref.attnum = k.ref_attnum
+        WHERE n_src.nspname = :schema
+          AND n_ref.nspname != :schema
+          AND c.contype = 'f'
+        ORDER BY t_src.relname, a_src.attname
+    """), {"schema": schema}).mappings().all()
+    return [
+        {
+            "source_table": row["source_table"],
+            "source_column": row["source_column"],
+            "referenced_schema": row["referenced_schema"],
+            "referenced_table": row["referenced_table"],
+            "referenced_column": row["referenced_column"],
+        }
+        for row in rows
+    ]
+
+
+def _find_invalid_indexes(
+    conn: Connection, schema: str
+) -> list[dict[str, Any]]:
+    """Detect invalid or not-ready indexes on application tables being
+    inspected.
+
+    Scope: restricted to tables in LEGACY_BASELINE_PG. Unrelated tables'
+    invalid indexes do NOT block baseline recognition.
+
+    This is a SEPARATE safety gate from _compare_baseline_pg(), which checks
+    index existence, uniqueness, and column composition — NOT validity.
+    Validity reported via status override "invalid_indexes_present".
+
+    Detection is read-only: no REINDEX, DROP, or ALTER INDEX.
+    """
+    application_tables = tuple(LEGACY_BASELINE_PG.keys())
+    rows = conn.execute(text("""
+        SELECT t.relname AS table_name,
+               i.relname AS index_name,
+               ix.indisvalid AS is_valid,
+               ix.indisready AS is_ready
+        FROM pg_index ix
+        JOIN pg_class i ON i.oid = ix.indexrelid
+        JOIN pg_class t ON t.oid = ix.indrelid
+        JOIN pg_namespace n ON n.oid = t.relnamespace
+        WHERE n.nspname = :schema
+          AND t.relname = ANY(:tables)
+          AND (ix.indisvalid = false OR ix.indisready = false)
+        ORDER BY t.relname, i.relname
+    """), {"schema": schema, "tables": list(application_tables)}).mappings().all()
+    return [
+        {
+            "table": row["table_name"],
+            "index": row["index_name"],
+            "is_valid": bool(row["is_valid"]),
+            "is_ready": bool(row["is_ready"]),
+        }
+        for row in rows
+    ]
+    
+    
+
+def _read_revisions(conn: Connection, schema: str) -> list[str]:
+    exists = conn.execute(text(
+        "SELECT 1 FROM information_schema.tables "
+        "WHERE table_schema = :schema AND table_name = 'alembic_version'"
+    ), {"schema": schema}).fetchone()
+    if not exists:
+        return []
+    quoted = '"' + schema.replace('"', '""') + '"'
+    rows = conn.execute(
+        text(f'SELECT version_num FROM {quoted}.alembic_version')
+    ).fetchall()
+    return [str(row[0]) for row in rows]
+
+
+# ============================================================================
+# Normalization + comparison helpers
+# ============================================================================
+
+
+# PostgreSQL transaction-start timestamp functions — semantically identical:
+# CURRENT_TIMESTAMP, now(), transaction_timestamp(). statement_timestamp()
+# and clock_timestamp() are DIFFERENT (statement start, wall clock) and are
+# NOT in this set. Empirical verification deferred to Step 3.5.
+_TIMESTAMP_DEFAULT_EQUIVALENTS = frozenset({
+    "CURRENT_TIMESTAMP",
+    "NOW()",
+    "TRANSACTION_TIMESTAMP()",
+})
+_TIMESTAMP_DEFAULT_CANONICAL = "CURRENT_TIMESTAMP"
+
+
+def _normalize_pg_type(value: str) -> str:
+    return " ".join(str(value or "").strip().lower().split())
+
+
+def _normalize_pg_default(value: str | None) -> str | None:
+    """Normalize PostgreSQL column_default for comparison.
+
+    nextval(...) -> None. Sequence name is unstable across ORM/PG versions;
+    sequence-backed generation is captured separately in id_generation
+    (see _get_columns) so SERIAL and plain INTEGER remain distinguishable.
+
+    Timestamp-equivalent defaults -> canonical "CURRENT_TIMESTAMP". All
+    other defaults compared as-is (whitespace-normalized).
+    """
+    if value is None:
+        return None
+    text_val = str(value).strip()
+    if text_val.startswith("nextval("):
+        return None
+    normalized = " ".join(text_val.split())
+    if normalized.upper() in _TIMESTAMP_DEFAULT_EQUIVALENTS:
+        return _TIMESTAMP_DEFAULT_CANONICAL
+    return normalized
+
+
+def _normalize_pg_check(value: str) -> str:
+    return " ".join(str(value or "").strip().split())
+
+
+def _diff_mapping(expected: dict[str, Any], actual: dict[str, Any]) -> dict[str, Any]:
+    expected_names = set(expected)
+    actual_names = set(actual)
+    return {
+        "missing": sorted(expected_names - actual_names),
+        "unexpected": sorted(actual_names - expected_names),
+        "changed": {
+            name: {"expected": expected[name], "actual": actual[name]}
+            for name in sorted(expected_names & actual_names)
+            if expected[name] != actual[name]
+        },
+    }
+
+
+def _compare_baseline_pg(
+    inspected: dict[str, dict[str, Any]],
+    actual_table_names: set[str],
+    revisions: list[str],
+    baseline: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Diff inspected PG schema against a baseline.
+
+    baseline defaults to LEGACY_BASELINE_PG when omitted, preserving all
+    existing callers. Callers verifying a specific Alembic revision's schema
+    must pass REVISION_BASELINES_PG[revision] explicitly so that the
+    comparison validates against the schema that revision is expected to
+    produce — not merely against the legacy baseline.
+
+    Per-column equality includes id_generation so SERIAL vs plain INTEGER
+    vs orphaned/manual sequence drift vs GENERATED IDENTITY is detected via
+    the standard comparison path.
+    """
+    expected_baseline = baseline if baseline is not None else LEGACY_BASELINE_PG
+    expected_tables = set(expected_baseline)
+    application_tables = actual_table_names - {_ALEMBIC_VERSION_TABLE}
+    missing_tables = sorted(expected_tables - application_tables)
+    unexpected_tables = sorted(application_tables - expected_tables)
+
+    missing_columns: dict[str, list[str]] = {}
+    unexpected_columns: dict[str, list[str]] = {}
+    column_mismatches: dict[str, dict[str, Any]] = {}
+    missing_indexes: dict[str, list[str]] = {}
+    unexpected_indexes: dict[str, list[str]] = {}
+    index_mismatches: dict[str, dict[str, Any]] = {}
+    foreign_key_mismatches: dict[str, dict[str, list[Any]]] = {}
+    check_constraint_mismatches: dict[str, dict[str, Any]] = {}
+
+    for table, expected in expected_baseline.items():
+        if table not in inspected:
+            continue
+        actual = inspected[table]
+
+        col_diff = _diff_mapping(expected["columns"], actual["columns"])
+        if col_diff["missing"]:
+            missing_columns[table] = col_diff["missing"]
+        if col_diff["unexpected"]:
+            unexpected_columns[table] = col_diff["unexpected"]
+        if col_diff["changed"]:
+            column_mismatches[table] = col_diff["changed"]
+
+        idx_diff = _diff_mapping(expected["indexes"], actual["indexes"])
+        if idx_diff["missing"]:
+            missing_indexes[table] = idx_diff["missing"]
+        if idx_diff["unexpected"]:
+            unexpected_indexes[table] = idx_diff["unexpected"]
+        if idx_diff["changed"]:
+            index_mismatches[table] = idx_diff["changed"]
+
+        expected_fks = expected["foreign_keys"]
+        actual_fks = actual["foreign_keys"]
+        if actual_fks != expected_fks:
+            foreign_key_mismatches[table] = {
+                "missing": sorted(expected_fks - actual_fks),
+                "unexpected": sorted(actual_fks - expected_fks),
+            }
+
+        if actual["checks"] != expected["checks"]:
+            check_constraint_mismatches[table] = {
+                "expected": expected["checks"],
+                "actual": actual["checks"],
+            }
+
+    exact = not (
+        missing_tables
+        or unexpected_tables
+        or missing_columns
+        or unexpected_columns
+        or column_mismatches
+        or missing_indexes
+        or unexpected_indexes
+        or index_mismatches
+        or foreign_key_mismatches
+        or check_constraint_mismatches
+    )
+    return {
+        "matches_known_baseline": exact,
+        "missing_tables": missing_tables,
+        "unexpected_tables": unexpected_tables,
+        "missing_columns": missing_columns,
+        "unexpected_columns": unexpected_columns,
+        "column_mismatches": column_mismatches,
+        "missing_indexes": missing_indexes,
+        "unexpected_indexes": unexpected_indexes,
+        "index_mismatches": index_mismatches,
+        "foreign_key_mismatches": foreign_key_mismatches,
+        "check_constraint_mismatches": check_constraint_mismatches,
+    }
+
+
+def _compare_against_revision(
+    revision: str,
+    inspected: dict[str, dict[str, Any]],
+    actual_table_names: set[str],
+) -> dict[str, Any]:
+    """Diff inspected PG schema against the baseline for a specific revision.
+
+    Raises SchemaTargetError if no baseline is defined for the revision. The
+    caller (preflight_postgres) guards against calling this with an unknown
+    revision — an unknown_revision status is returned instead, which the
+    migration gate treats as a refusal.
+
+    This helper is the boundary that prevents revision-table trust: a
+    database stamped at 000000000002 whose schema does not match
+    _REVISION_0002_BASELINE is classified as mismatched and refused by
+    env.py, closing the corruption gap the version table alone cannot
+    detect.
+    """
+    if revision not in REVISION_BASELINES_PG:
+        raise SchemaTargetError(
+            f"No schema baseline defined for revision {revision!r}"
+        )
+    return _compare_baseline_pg(
+        inspected,
+        actual_table_names,
+        [revision],
+        baseline=REVISION_BASELINES_PG[revision],
+    )
