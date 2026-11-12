@@ -5,13 +5,26 @@ read, hashed, rewritten, or populated; their new provenance fields remain
 NULL until a later, explicitly approved application workflow records reliable
 evidence.
 
-Failure recovery:
+Dialect support:
+- SQLite: original implementation, unchanged.
+- PostgreSQL: added in Phase 3. PostgreSQL supports transactional DDL, so a
+  failed upgrade automatically rolls back the partial schema change. The
+  cleanup routine is a no-op on PostgreSQL because the transaction rollback
+  is sufficient and correct.
+
+Failure recovery (SQLite):
     SQLite DDL is non-transactional in Alembic. To prevent a partial upgrade
     from being mistaken for a successful one, the migration captures the
     schema (columns AND indexes) BEFORE any DDL runs and only cleans up
     objects it actually created. If cleanup itself fails, the caller raises
     an explicit recovery error and the operator must restore the verified
     backup before retrying.
+
+Failure recovery (PostgreSQL):
+    Alembic runs each migration inside a transaction when the target supports
+    transactional DDL (PostgreSQL does). Any exception inside upgrade() causes
+    the entire transaction to roll back, undoing all DDL performed by this
+    migration. No explicit cleanup is required.
 """
 
 from typing import Sequence, Union
@@ -36,25 +49,49 @@ _PROVENANCE_INDEX = "ix_predictions_image_sha256"
 
 
 def _capture_predictions_columns() -> set[str]:
-    """Snapshot the current column names on the predictions table."""
+    """Snapshot current column names on predictions. Dialect-aware."""
     connection = op.get_bind()
-    return {
-        row[1]
-        for row in connection.exec_driver_sql(
-            'PRAGMA table_info("predictions")'
+    if connection.dialect.name == "sqlite":
+        return {
+            row[1]
+            for row in connection.exec_driver_sql(
+                'PRAGMA table_info("predictions")'
+            ).fetchall()
+        }
+    elif connection.dialect.name == "postgresql":
+        rows = connection.exec_driver_sql(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = current_schema() AND table_name = 'predictions'"
         ).fetchall()
-    }
+        return {str(row[0]) for row in rows}
+    else:
+        raise RuntimeError(
+            f"Unsupported database dialect: {connection.dialect.name!r}. "
+            "This migration supports only SQLite and PostgreSQL."
+        )
 
 
 def _capture_predictions_indexes() -> set[str]:
-    """Snapshot the current index names on the predictions table."""
+    """Snapshot current index names on predictions. Dialect-aware."""
     connection = op.get_bind()
-    return {
-        row[1]
-        for row in connection.exec_driver_sql(
-            'PRAGMA index_list("predictions")'
+    if connection.dialect.name == "sqlite":
+        return {
+            row[1]
+            for row in connection.exec_driver_sql(
+                'PRAGMA index_list("predictions")'
+            ).fetchall()
+        }
+    elif connection.dialect.name == "postgresql":
+        rows = connection.exec_driver_sql(
+            "SELECT indexname FROM pg_indexes "
+            "WHERE schemaname = current_schema() AND tablename = 'predictions'"
         ).fetchall()
-    }
+        return {str(row[0]) for row in rows}
+    else:
+        raise RuntimeError(
+            f"Unsupported database dialect: {connection.dialect.name!r}. "
+            "This migration supports only SQLite and PostgreSQL."
+        )
 
 
 def _cleanup_partial_upgrade(
@@ -63,19 +100,20 @@ def _cleanup_partial_upgrade(
 ) -> None:
     """Remove only schema objects proven to have been created by this migration.
 
-    Args:
-        pre_columns: Column set captured BEFORE any DDL in upgrade() ran.
-        pre_indexes: Index set captured BEFORE any DDL in upgrade() ran.
-
-    Only columns/indexes present in the CURRENT schema but ABSENT from the
-    pre-snapshot are candidates for cleanup. Anything that already existed
-    before the migration started is never touched, because dropping it would
-    destroy data this migration did not create.
+    SQLite: explicit DROP COLUMN / DROP INDEX required (non-transactional DDL).
+    PostgreSQL: no-op — transactional DDL rolls back automatically.
     """
     connection = op.get_bind()
+    if connection.dialect.name == "postgresql":
+        return
+
+    if connection.dialect.name != "sqlite":
+        raise RuntimeError(
+            f"Unsupported database dialect: {connection.dialect.name!r}."
+        )
+
     current_columns = _capture_predictions_columns()
     current_indexes = _capture_predictions_indexes()
-
     created_columns = current_columns - pre_columns
     created_indexes = current_indexes - pre_indexes
 
@@ -93,14 +131,9 @@ def _cleanup_partial_upgrade(
 def upgrade() -> None:
     """Add provenance columns without changing existing prediction data."""
 
-    # Snapshot schema BEFORE any DDL. Used for safe cleanup on failure.
     pre_columns = _capture_predictions_columns()
     pre_indexes = _capture_predictions_indexes()
 
-    # Fail-closed if any provenance column already exists BEFORE we start.
-    # We cannot safely clean up in that case — we would not know whether the
-    # pre-existing object was created by this migration or by manual
-    # intervention.
     conflicts = set(_PROVENANCE_COLUMNS) & pre_columns
     if conflicts:
         raise RuntimeError(
@@ -109,7 +142,6 @@ def upgrade() -> None:
             "Manual intervention required — investigate before retrying."
         )
 
-    # Fail-closed if the provenance index already exists BEFORE we start.
     if _PROVENANCE_INDEX in pre_indexes:
         raise RuntimeError(
             "Cannot safely migrate: provenance index already exists before "
@@ -118,8 +150,6 @@ def upgrade() -> None:
         )
 
     try:
-        # All columns are nullable because the legacy baseline did not record
-        # provenance. SQLite can add these columns without a table rebuild.
         op.add_column(
             "predictions",
             sa.Column("image_sha256", sa.String(length=64), nullable=True),
@@ -159,7 +189,6 @@ def upgrade() -> None:
                 "could not be cleaned up; restore the verified backup before "
                 "retrying"
             ) from cleanup_error
-        # Bare raise preserves the original traceback (better than `raise exc`)
         raise
 
 
