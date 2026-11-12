@@ -298,3 +298,36 @@ alembic -c backend/alembic.ini \
   -x expected_schema=public \
   -x allow_fresh=true \
   upgrade head
+
+
+### Production migration invocation
+
+In a production environment, running `alembic upgrade` requires BOTH:
+
+1. **`DATABASE_URL` environment variable** — any valid PostgreSQL URL. This
+   satisfies the application's production guard (raised at
+   `app/database/database.py` import time when `ENVIRONMENT=production`).
+   Without it, the import fails before Alembic's own checks run.
+2. **`-x db_url=...` Alembic argument** — the actual migration target.
+
+These should reference the SAME database. If they diverge, the guard passes
+(DATABASE_URL is set) but migrations execute against a different target — a
+subtle but real failure mode to avoid.
+
+Example production invocation:
+
+    DATABASE_URL="postgresql://agrimind_migrator:PASSWORD@host:5432/db" \
+    alembic -c backend/alembic.ini \
+      -x db_url="postgresql://agrimind_migrator:PASSWORD@host:5432/db?sslmode=verify-full" \
+      -x expected_database=db \
+      -x expected_user=agrimind_migrator \
+      -x expected_schema=public \
+      -x allow_existing=true \
+      upgrade head
+
+**Why this coupling exists:** `alembic/env.py` imports `Base` from
+`app.database.database`, triggering that module's production guard. A future
+phase may refactor this to a runtime `validate_production_config()` call so
+that `alembic upgrade` can run without `DATABASE_URL` — the `-x db_url`
+becomes the sole source of truth for the migration target. Deferred to a
+later phase.
