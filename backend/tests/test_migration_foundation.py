@@ -350,10 +350,12 @@ def test_fresh_database_initialization_through_alembic(disposable_database_dir: 
     )
 
     command.upgrade(config, "head")
+    from alembic.script import ScriptDirectory
+    expected_head = ScriptDirectory.from_config(config).get_current_head()
     with sqlite3.connect(database) as connection:
         assert connection.execute(
             "SELECT version_num FROM alembic_version"
-        ).fetchall() == [("000000000002",)]
+        ).fetchall() == [(expected_head,)]
         columns = {
             row[1]: (row[2], row[3])
             for row in connection.execute("PRAGMA table_info(predictions)")

@@ -154,10 +154,10 @@ def _stamp_baseline(database: Path) -> None:
     command.stamp(config, "000000000001")
 
 
-def _upgrade_head(database: Path) -> None:
+def _upgrade_head(database: Path, target: str = "head") -> None:
     command = _alembic_command()
     config = _alembic_config(database, command.upgrade, "allow_existing=true")
-    command.upgrade(config, "head")
+    command.upgrade(config, target)
 
 
 def _revision_and_columns(database: Path) -> tuple[list[str], dict[str, tuple[str, int]]]:
@@ -198,7 +198,8 @@ def test_fresh_database_reaches_prediction_provenance_revision(
 ):
     database = disposable_database_dir / "fresh-provenance.db"
 
-    _upgrade_head(database)
+    # Pin to 000000000002: this test verifies revision 002's schema, not head.
+    _upgrade_head(database, "000000000002")
 
     revisions, columns = _revision_and_columns(database)
     assert revisions == ["000000000002"]

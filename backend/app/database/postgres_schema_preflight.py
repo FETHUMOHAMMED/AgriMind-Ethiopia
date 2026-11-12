@@ -346,9 +346,103 @@ _REVISION_0002_BASELINE["predictions"]["indexes"]["ix_predictions_image_sha256"]
     "columns": ("image_sha256",),
 }
 
+# Revision 000000000003 adds field_cases (Phase 4).
+# CHECK constraint strings are pg_get_constraintdef() rendering on PG 18
+# (whitespace-normalized to match _normalize_pg_check). PG major version
+# upgrades may re-render these — capture fresh strings when bumping PG.
+_REVISION_0003_BASELINE: dict[str, Any] = copy.deepcopy(_REVISION_0002_BASELINE)
+_REVISION_0003_BASELINE["field_cases"] = {
+    "columns": {
+        "id": {
+            "type": "integer", "nullable": False, "primary_key": True,
+            "default": None, "id_generation": "serial",
+        },
+        "case_id": {
+            "type": "character varying(40)", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "collector_user_id": {
+            "type": "integer", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "prediction_id": {
+            "type": "integer", "nullable": True, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "crop": {
+            "type": "character varying(100)", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "variety": {
+            "type": "character varying(100)", "nullable": True, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "plant_part": {
+            "type": "character varying(100)", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "growth_stage": {
+            "type": "character varying(100)", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "observed_symptoms": {
+            "type": "character varying(4000)", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "region": {
+            "type": "character varying(100)", "nullable": True, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "zone": {
+            "type": "character varying(100)", "nullable": True, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "woreda": {
+            "type": "character varying(100)", "nullable": True, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "latitude": {
+            "type": "double precision", "nullable": True, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "longitude": {
+            "type": "double precision", "nullable": True, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "collection_date": {
+            "type": "date", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "consent_status": {
+            "type": "character varying(20)", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "created_at": {
+            "type": "timestamp with time zone", "nullable": False, "primary_key": False,
+            "default": "CURRENT_TIMESTAMP", "id_generation": "plain",
+        },
+    },
+    "indexes": {
+        "ix_field_cases_case_id": {"unique": True, "columns": ("case_id",)},
+        "ix_field_cases_collector_user_id": {"unique": False, "columns": ("collector_user_id",)},
+        "ix_field_cases_id": {"unique": False, "columns": ("id",)},
+        "ix_field_cases_prediction_id": {"unique": False, "columns": ("prediction_id",)},
+    },
+    "foreign_keys": {
+        ("collector_user_id", "users", "id"),
+        ("prediction_id", "predictions", "id"),
+    },
+    "checks": (
+        "CHECK (((consent_status)::text = ANY ((ARRAY['granted'::character varying, 'denied'::character varying])::text[])))",
+        "CHECK (((latitude IS NULL) OR ((latitude >= ('-90'::integer)::double precision) AND (latitude <= (90)::double precision))))",
+        "CHECK (((longitude IS NULL) OR ((longitude >= ('-180'::integer)::double precision) AND (longitude <= (180)::double precision))))",
+    ),
+}
+
 REVISION_BASELINES_PG: dict[str, dict[str, Any]] = {
     "000000000001": LEGACY_BASELINE_PG,
     "000000000002": _REVISION_0002_BASELINE,
+    "000000000003": _REVISION_0003_BASELINE,
 }
 
 
@@ -1269,6 +1363,7 @@ def _compare_against_revision(
     env.py, closing the corruption gap the version table alone cannot
     detect.
     """
+    
     if revision not in REVISION_BASELINES_PG:
         raise SchemaTargetError(
             f"No schema baseline defined for revision {revision!r}"
