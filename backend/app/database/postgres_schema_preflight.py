@@ -559,10 +559,17 @@ _REVISION_0005_BASELINE["expert_reviews"] = {
         ("field_case_id", "field_cases", "id"),
         ("reviewer_user_id", "users", "id"),
     },
+    # Checks MUST be ordered by their normalized string content (uppercase,
+    # whitespace-collapsed), NOT by constraint name, to match _get_checks()
+    # which returns tuple(sorted(...)). For expert_reviews, the shared prefix
+    # "CHECK ((((STATUS)::TEXT..." makes content-sort differ from name-sort:
+    #   verified_fields  -> "CHECK ((((STATUS)::TEXT <> 'VERIFIED'::TEXT)..." (starts with ' at tie-break)
+    #   completed_method -> "CHECK ((((STATUS)::TEXT <> ALL ((ARRAY..." (starts with A at tie-break)
+    #   status           -> "CHECK (((STATUS)::TEXT = ANY..." (no 4th paren)
     "checks": (
+        "CHECK ((((status)::text <> 'verified'::text) OR ((verified_diagnosis IS NOT NULL) AND (length(TRIM(BOTH FROM verified_diagnosis)) > 0) AND (verification_method IS NOT NULL) AND (length(TRIM(BOTH FROM verification_method)) > 0))))",
         "CHECK ((((status)::text <> ALL ((ARRAY['uncertain'::character varying, 'rejected'::character varying])::text[])) OR ((verification_method IS NOT NULL) AND (length(TRIM(BOTH FROM verification_method)) > 0))))",
         "CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'verified'::character varying, 'uncertain'::character varying, 'rejected'::character varying])::text[])))",
-        "CHECK ((((status)::text <> 'verified'::text) OR ((verified_diagnosis IS NOT NULL) AND (length(TRIM(BOTH FROM verified_diagnosis)) > 0) AND (verification_method IS NOT NULL) AND (length(TRIM(BOTH FROM verification_method)) > 0))))",
     ),
 }
 
