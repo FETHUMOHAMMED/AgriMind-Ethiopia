@@ -439,10 +439,70 @@ _REVISION_0003_BASELINE["field_cases"] = {
     ),
 }
 
+# Revision 000000000004 adds consent_records (Phase 4).
+# CHECK constraint strings are pg_get_constraintdef() rendering on PG 18
+# (whitespace-normalized to match _normalize_pg_check). Note TRIM(BOTH FROM ...)
+# rendering on policy_version — PG 18's normalization of the ORM's
+# length(trim(policy_version)) expression. Re-capture when bumping PG major.
+_REVISION_0004_BASELINE: dict[str, Any] = copy.deepcopy(_REVISION_0003_BASELINE)
+_REVISION_0004_BASELINE["consent_records"] = {
+    "columns": {
+        "id": {
+            "type": "integer", "nullable": False, "primary_key": True,
+            "default": None, "id_generation": "serial",
+        },
+        "field_case_id": {
+            "type": "integer", "nullable": True, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "subject_user_id": {
+            "type": "integer", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "purpose": {
+            "type": "character varying(40)", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "status": {
+            "type": "character varying(20)", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "policy_version": {
+            "type": "character varying(100)", "nullable": True, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "recorded_at": {
+            "type": "timestamp with time zone", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "created_at": {
+            "type": "timestamp with time zone", "nullable": False, "primary_key": False,
+            "default": "CURRENT_TIMESTAMP", "id_generation": "plain",
+        },
+    },
+    "indexes": {
+        "ix_consent_records_field_case_id": {"unique": False, "columns": ("field_case_id",)},
+        "ix_consent_records_id": {"unique": False, "columns": ("id",)},
+        "ix_consent_records_purpose": {"unique": False, "columns": ("purpose",)},
+        "ix_consent_records_status": {"unique": False, "columns": ("status",)},
+        "ix_consent_records_subject_user_id": {"unique": False, "columns": ("subject_user_id",)},
+    },
+    "foreign_keys": {
+        ("field_case_id", "field_cases", "id"),
+        ("subject_user_id", "users", "id"),
+    },
+    "checks": (
+        "CHECK (((policy_version IS NULL) OR (length(TRIM(BOTH FROM policy_version)) > 0)))",
+        "CHECK (((purpose)::text = ANY ((ARRAY['observation_collection'::character varying, 'expert_review'::character varying, 'ai_training'::character varying, 'precise_location'::character varying])::text[])))",
+        "CHECK (((status)::text = ANY ((ARRAY['granted'::character varying, 'denied'::character varying, 'withdrawn'::character varying])::text[])))",
+    ),
+}
+
 REVISION_BASELINES_PG: dict[str, dict[str, Any]] = {
     "000000000001": LEGACY_BASELINE_PG,
     "000000000002": _REVISION_0002_BASELINE,
     "000000000003": _REVISION_0003_BASELINE,
+    "000000000004": _REVISION_0004_BASELINE,
 }
 
 
