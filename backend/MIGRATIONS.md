@@ -225,3 +225,76 @@ Cleanup uses `ALTER TABLE ... DROP COLUMN`, which requires **SQLite 3.35.0+**
 (released March 2021). Python 3.10+ bundles compatible SQLite. On older
 Python versions with older SQLite, cleanup will fail — triggering the
 fail-closed recovery path described above. This is documented, not a bug.
+
+
+## PostgreSQL migrations (Phase 3)
+
+### Overview
+
+The Alembic migration chain supports both SQLite and PostgreSQL. The revision
+chain (`000000000001 → 000000000002 → ...`) is identical for both dialects.
+Migration head is `000000000002` as of Phase 3 completion.
+
+Migration behavior differences:
+
+- **SQLite**: original implementation. Captures columns/indexes BEFORE any DDL
+  runs and cleans up created objects on failure. Requires SQLite 3.35.0+ for
+  `ALTER TABLE DROP COLUMN` during cleanup.
+- **PostgreSQL**: uses `information_schema` and `pg_indexes` for inspection.
+  PostgreSQL supports transactional DDL, so any failure inside `upgrade()`
+  automatically rolls back the entire transaction — no explicit cleanup
+  needed. The `_cleanup_partial_upgrade()` function is a no-op on PostgreSQL.
+
+### Required flags for PostgreSQL
+
+Every Alembic command against a PostgreSQL target MUST include:
+
+| Flag | Purpose |
+|---|---|
+| `-x db_url=postgresql://...` | Explicit connection URL (existing requirement) |
+| `-x expected_database=<name>` | Expected `current_database()` value |
+| `-x expected_user=<name>` | Expected `current_user` value (must not be superuser) |
+| `-x expected_schema=<name>` | Expected `current_schema()` value (default: `public`) |
+
+The expected identity is supplied **independently** of the connection URL —
+a target-switching attack (DNS rotation, load balancer redirect, proxy
+rewrite) cannot convince the preflight to accept the wrong database.
+
+### Connection identity verification
+
+`guard_postgres_target()` verifies on the live connection:
+
+- ✅ `current_database()` == `expected_database`
+- ✅ `current_user` == `expected_user`
+- ✅ `current_schema()` == `expected_schema`
+- ✅ `current_user` is NOT a superuser (`rolsuper = false`)
+
+**Logged but NOT compared:** `inet_server_addr()`, `inet_server_port()`.
+In containerized, managed-database, or proxy-fronted deployments,
+`inet_server_addr()` differs from the DNS name in the URL by design.
+MITM protection is provided by TLS, not by server-IP comparison.
+
+### TLS requirement in production
+
+When `ENVIRONMENT=production`, the `DATABASE_URL` MUST include
+`sslmode=verify-full`. This enables both certificate validation AND hostname
+verification, preventing MITM attacks.
+
+`sslmode=require` alone only encrypts the connection but does NOT verify the
+server's hostname — a MITM with any valid certificate would pass.
+
+There is no localhost exception. `ENVIRONMENT=production` + localhost + no
+certificate is a misconfiguration that fails loudly.
+
+### Fresh install on PostgreSQL
+
+For a genuinely empty PostgreSQL database:
+
+```text
+alembic -c backend/alembic.ini \
+  -x db_url=postgresql://agrimind_app:PASSWORD@HOST:5432/DBNAME \
+  -x expected_database=DBNAME \
+  -x expected_user=agrimind_app \
+  -x expected_schema=public \
+  -x allow_fresh=true \
+  upgrade head
