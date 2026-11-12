@@ -498,11 +498,80 @@ _REVISION_0004_BASELINE["consent_records"] = {
     ),
 }
 
+# Revision 000000000005 adds expert_reviews (Phase 4).
+# CHECK constraint strings are pg_get_constraintdef() rendering on PG 18
+# (whitespace-normalized to match _normalize_pg_check). Note <> ALL / = ANY /
+# <> 'verified'::text renderings. Re-capture when bumping PG major.
+#
+# UNIQUE CONSTRAINT NOTE: uq_expert_reviews_case_reviewer appears as both a
+# pg_constraint entry AND a backing index in pg_index. _get_indexes() reads
+# from pg_index (excluding only primary keys), so the backing index appears
+# in the baseline's indexes dict with unique=True. This is the first baseline
+# to contain a unique backing index; prior revisions had only non-unique.
+_REVISION_0005_BASELINE: dict[str, Any] = copy.deepcopy(_REVISION_0004_BASELINE)
+_REVISION_0005_BASELINE["expert_reviews"] = {
+    "columns": {
+        "id": {
+            "type": "integer", "nullable": False, "primary_key": True,
+            "default": None, "id_generation": "serial",
+        },
+        "field_case_id": {
+            "type": "integer", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "reviewer_user_id": {
+            "type": "integer", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "status": {
+            "type": "character varying(20)", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "verified_diagnosis": {
+            "type": "character varying(200)", "nullable": True, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "verification_method": {
+            "type": "character varying(200)", "nullable": True, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "review_notes": {
+            "type": "character varying(4000)", "nullable": True, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "reviewed_at": {
+            "type": "timestamp with time zone", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "created_at": {
+            "type": "timestamp with time zone", "nullable": False, "primary_key": False,
+            "default": "CURRENT_TIMESTAMP", "id_generation": "plain",
+        },
+    },
+    "indexes": {
+        "ix_expert_reviews_field_case_id": {"unique": False, "columns": ("field_case_id",)},
+        "ix_expert_reviews_id": {"unique": False, "columns": ("id",)},
+        "ix_expert_reviews_reviewer_user_id": {"unique": False, "columns": ("reviewer_user_id",)},
+        "ix_expert_reviews_status": {"unique": False, "columns": ("status",)},
+        "uq_expert_reviews_case_reviewer": {"unique": True, "columns": ("field_case_id", "reviewer_user_id")},
+    },
+    "foreign_keys": {
+        ("field_case_id", "field_cases", "id"),
+        ("reviewer_user_id", "users", "id"),
+    },
+    "checks": (
+        "CHECK ((((status)::text <> ALL ((ARRAY['uncertain'::character varying, 'rejected'::character varying])::text[])) OR ((verification_method IS NOT NULL) AND (length(TRIM(BOTH FROM verification_method)) > 0))))",
+        "CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'verified'::character varying, 'uncertain'::character varying, 'rejected'::character varying])::text[])))",
+        "CHECK ((((status)::text <> 'verified'::text) OR ((verified_diagnosis IS NOT NULL) AND (length(TRIM(BOTH FROM verified_diagnosis)) > 0) AND (verification_method IS NOT NULL) AND (length(TRIM(BOTH FROM verification_method)) > 0))))",
+    ),
+}
+
 REVISION_BASELINES_PG: dict[str, dict[str, Any]] = {
     "000000000001": LEGACY_BASELINE_PG,
     "000000000002": _REVISION_0002_BASELINE,
     "000000000003": _REVISION_0003_BASELINE,
     "000000000004": _REVISION_0004_BASELINE,
+    "000000000005": _REVISION_0005_BASELINE,
 }
 
 
