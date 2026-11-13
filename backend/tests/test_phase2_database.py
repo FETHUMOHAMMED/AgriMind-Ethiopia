@@ -38,6 +38,11 @@ def _run_in_subprocess(code: str, *, extra_env: dict = None) -> subprocess.Compl
     )
 
 
+@pytest.mark.skipif(
+    os.environ.get("TEST_BACKEND", "sqlite").strip().lower() == "postgres",
+    reason="SQLite-specific behavior: PRAGMA foreign_keys and _is_sqlite flag "
+           "are not applicable on PostgreSQL",
+)
 class TestSQLiteEngine:
     def test_engine_initializes(self):
         from app.database.database import engine, _is_sqlite
