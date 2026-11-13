@@ -573,12 +573,84 @@ _REVISION_0005_BASELINE["expert_reviews"] = {
     ),
 }
 
+# Revision 000000000006 adds expert_adjudications (Phase 4).
+# CHECK constraint strings are pg_get_constraintdef() rendering on PG 18,
+# ordered by normalized content (uppercase, whitespace-collapsed) to match
+# _get_checks() which returns tuple(sorted(normalized_strings)). The
+# final_diagnosis check comes first because at the tie-break position the
+# 4th opening paren in "CHECK ((((decision)..." (ASCII 40) sorts before the
+# 'd' in "CHECK (((decision)...". Re-capture when bumping PG major.
+#
+# UNIQUE INDEX NOTE: ix_expert_adjudications_field_case_id uses unique=True
+# on the index (not a table-level UNIQUE CONSTRAINT like migration 005).
+# _get_indexes() reads pg_index, so the baseline captures it as
+# unique=True in the indexes dict. Semantically equivalent to a constraint
+# but with distinct catalog shape.
+_REVISION_0006_BASELINE: dict[str, Any] = copy.deepcopy(_REVISION_0005_BASELINE)
+_REVISION_0006_BASELINE["expert_adjudications"] = {
+    "columns": {
+        "id": {
+            "type": "integer", "nullable": False, "primary_key": True,
+            "default": None, "id_generation": "serial",
+        },
+        "field_case_id": {
+            "type": "integer", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "adjudicator_user_id": {
+            "type": "integer", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "decision": {
+            "type": "character varying(32)", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "final_diagnosis": {
+            "type": "character varying(200)", "nullable": True, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "taxonomy_version": {
+            "type": "character varying(100)", "nullable": True, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "decision_rationale": {
+            "type": "character varying(4000)", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "decided_at": {
+            "type": "timestamp with time zone", "nullable": False, "primary_key": False,
+            "default": None, "id_generation": "plain",
+        },
+        "created_at": {
+            "type": "timestamp with time zone", "nullable": False, "primary_key": False,
+            "default": "CURRENT_TIMESTAMP", "id_generation": "plain",
+        },
+    },
+    "indexes": {
+        "ix_expert_adjudications_adjudicator_user_id": {"unique": False, "columns": ("adjudicator_user_id",)},
+        "ix_expert_adjudications_decision": {"unique": False, "columns": ("decision",)},
+        "ix_expert_adjudications_field_case_id": {"unique": True, "columns": ("field_case_id",)},
+        "ix_expert_adjudications_id": {"unique": False, "columns": ("id",)},
+    },
+    "foreign_keys": {
+        ("adjudicator_user_id", "users", "id"),
+        ("field_case_id", "field_cases", "id"),
+    },
+    # Ordered by normalized content, not by constraint name — same rule as 005.
+    # Copy-pasted verbatim from live PG 18 _get_checks() output.
+    "checks": (
+        "CHECK ((((decision)::text <> ALL ((ARRAY['agreement'::character varying, 'disagreement'::character varying])::text[])) OR ((final_diagnosis IS NOT NULL) AND (length(TRIM(BOTH FROM final_diagnosis)) > 0))))",
+        "CHECK (((decision)::text = ANY ((ARRAY['agreement'::character varying, 'disagreement'::character varying, 'uncertain'::character varying, 'rejected'::character varying])::text[])))",
+    ),
+}
+
 REVISION_BASELINES_PG: dict[str, dict[str, Any]] = {
     "000000000001": LEGACY_BASELINE_PG,
     "000000000002": _REVISION_0002_BASELINE,
     "000000000003": _REVISION_0003_BASELINE,
     "000000000004": _REVISION_0004_BASELINE,
     "000000000005": _REVISION_0005_BASELINE,
+    "000000000006": _REVISION_0006_BASELINE,
 }
 
 
