@@ -27,16 +27,22 @@ class FieldCase(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (
-        CheckConstraint(
-            "consent_status IN ('granted', 'denied')",
-            name="ck_field_cases_consent_status",
-        ),
-        CheckConstraint(
-            "latitude IS NULL OR latitude BETWEEN -90 AND 90",
-            name="ck_field_cases_latitude",
-        ),
-        CheckConstraint(
-            "longitude IS NULL OR longitude BETWEEN -180 AND 180",
-            name="ck_field_cases_longitude",
-        ),
-    )
+    CheckConstraint(
+        "consent_status IN ('granted', 'denied')",
+        name="ck_field_cases_consent_status",
+    ),
+    CheckConstraint(
+        "latitude IS NULL OR latitude BETWEEN -90 AND 90",
+        name="ck_field_cases_latitude",
+    ),
+    CheckConstraint(
+        "longitude IS NULL OR longitude BETWEEN -180 AND 180",
+        name="ck_field_cases_longitude",
+    ),
+    CheckConstraint(
+        "length(trim(observed_symptoms)) > 0",
+        name="ck_field_cases_observed_symptoms_not_blank",
+    ),
+)
+    
+    

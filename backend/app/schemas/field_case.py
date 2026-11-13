@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 ConsentPurpose = Literal[
@@ -72,8 +72,16 @@ class FieldCaseCreate(BaseModel):
                 "precise_location consent is required before coordinates are collected"
             )
         return self
-
-
+         
+    @field_validator("observed_symptoms")
+    @classmethod
+    def _validate_observed_symptoms_not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("observed_symptoms must not be whitespace-only")
+        return v
+    
+    
+           
 class ConsentChangeCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

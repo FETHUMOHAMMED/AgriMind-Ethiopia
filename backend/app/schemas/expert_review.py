@@ -1,8 +1,7 @@
 from datetime import date
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 ReviewStatus = Literal["pending", "verified", "uncertain", "rejected"]
 AdjudicationDecision = Literal[
@@ -39,6 +38,7 @@ class ExpertReviewCreate(BaseModel):
                     "verification_method is required for a completed review"
                 )
         return self
+    
 
 
 class ExpertReviewResponse(BaseModel):
@@ -75,6 +75,14 @@ class ExpertAdjudicationCreate(BaseModel):
                 "uncertain and rejected decisions cannot contain a final diagnosis or taxonomy"
             )
         return self
+    
+    
+    @field_validator("decision_rationale")
+    @classmethod
+    def _validate_decision_rationale_not_blank(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("decision_rationale must not be whitespace-only")
+        return v
 
 
 class ExpertAdjudicationResponse(BaseModel):

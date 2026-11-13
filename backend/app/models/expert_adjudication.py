@@ -30,13 +30,17 @@ class ExpertAdjudication(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     __table_args__ = (
-        CheckConstraint(
-            "decision IN ('agreement', 'disagreement', 'uncertain', 'rejected')",
-            name="ck_expert_adjudications_decision",
-        ),
-        CheckConstraint(
-            "decision NOT IN ('agreement', 'disagreement') OR "
-            "(final_diagnosis IS NOT NULL AND length(trim(final_diagnosis)) > 0)",
-            name="ck_expert_adjudications_final_diagnosis",
-        ),
-    )
+    CheckConstraint(
+        "decision IN ('agreement', 'disagreement', 'uncertain', 'rejected')",
+        name="ck_expert_adjudications_decision",
+    ),
+    CheckConstraint(
+        "decision NOT IN ('agreement', 'disagreement') OR "
+        "(final_diagnosis IS NOT NULL AND length(trim(final_diagnosis)) > 0)",
+        name="ck_expert_adjudications_final_diagnosis",
+    ),
+    CheckConstraint(
+        "length(trim(decision_rationale)) > 0",
+        name="ck_expert_adjudications_decision_rationale_not_blank",
+    ),
+)

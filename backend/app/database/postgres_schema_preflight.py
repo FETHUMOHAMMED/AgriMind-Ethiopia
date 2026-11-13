@@ -644,6 +644,36 @@ _REVISION_0006_BASELINE["expert_adjudications"] = {
     ),
 }
 
+# Revision 000000000007 adds whitespace-rejection CHECK constraints to
+# field_cases.observed_symptoms and expert_adjudications.decision_rationale.
+# CHECK strings follow PG 18 rendering with TRIM(BOTH FROM ...) — re-capture
+# when bumping PG major.
+#
+# CHECK tuples below are DELIBERATELY sorted to prove the comparator's
+# sorted() comparison in _compare_baseline_pg() handles author-order-agnostic
+# baselines. Regression test for the 005-class bug: the fix in 4.5 sorts both
+# sides, so the baseline doesn't need to be sorted manually.
+_REVISION_0007_BASELINE: dict[str, Any] = copy.deepcopy(_REVISION_0006_BASELINE)
+
+_REVISION_0007_BASELINE["field_cases"]["checks"] = tuple(
+    sorted(
+        _REVISION_0007_BASELINE["field_cases"]["checks"]
+        + (
+            "CHECK ((length(TRIM(BOTH FROM observed_symptoms)) > 0))",
+        )
+    )
+)
+
+_REVISION_0007_BASELINE["expert_adjudications"]["checks"] = tuple(
+    sorted(
+        _REVISION_0007_BASELINE["expert_adjudications"]["checks"]
+        + (
+            "CHECK ((length(TRIM(BOTH FROM decision_rationale)) > 0))",
+        )
+    )
+)
+
+
 REVISION_BASELINES_PG: dict[str, dict[str, Any]] = {
     "000000000001": LEGACY_BASELINE_PG,
     "000000000002": _REVISION_0002_BASELINE,
@@ -651,6 +681,7 @@ REVISION_BASELINES_PG: dict[str, dict[str, Any]] = {
     "000000000004": _REVISION_0004_BASELINE,
     "000000000005": _REVISION_0005_BASELINE,
     "000000000006": _REVISION_0006_BASELINE,
+    "000000000007": _REVISION_0007_BASELINE,
 }
 
 
@@ -1520,7 +1551,11 @@ def _compare_baseline_pg(
                 "unexpected": sorted(actual_fks - expected_fks),
             }
 
-        if actual["checks"] != expected["checks"]:
+        # Compare check constraints order-independently. _get_checks() returns
+        # sorted normalized strings, but baseline authors may author in any
+        # order. Sorting both sides removes the class of bug where a
+        # correctly-matching baseline is flagged as drifted due to author order.
+        if tuple(sorted(actual["checks"])) != tuple(sorted(expected["checks"])):
             check_constraint_mismatches[table] = {
                 "expected": expected["checks"],
                 "actual": actual["checks"],
